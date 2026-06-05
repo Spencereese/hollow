@@ -1,0 +1,67 @@
+{
+  "intake_form": {
+    "id": "intake_form",
+    "title": "SPECIAL INTAKE & CLEARANCE FORM",
+    "subtitle": "Property Relocation Division — File #H-1974-09",
+    "excerpts": [
+      "Property: Unlisted lakeside residence, 14.2 acres, access road unmarked.",
+      "Client: [REDACTED] / Authority granted under Special Clearance Protocol 7.",
+      "Objective: Catalog all personal effects. Remove or document any 'lingering claims'. Secure all egress points from inside.",
+      "Previous Specialist: M. R. (terminated). Notes: 'Not thorough. The house remembers faces. Do not photograph the girl.'",
+      "Current Assignee: [Your name appears here in faint overlay text you don't remember typing].",
+      "Estimated time on site: 4 hours. Do not exceed 6."
+    ],
+    "reveals": "The signature line at the bottom is already filled. The handwriting is yours, but the date is from two days ago. You have never been here before today."
+  },
+  "polaroid": {
+    "id": "polaroid",
+    "title": "Polaroid — 'The Family'",
+    "subtitle": "Dated October 1974 on the back in pencil",
+    "initial_desc": "A mother and father stand behind a young girl in front of the stone fireplace. Everyone is smiling. The flash is harsh. The girl is holding a small stuffed rabbit by one ear.",
+    "corrupted_desc": "The girl's face has been burned away with something chemical after the photo was developed. The smear starts at the eyes and pulls downward, as if the image itself tried to look away. The rabbit is still there. The parents are still smiling.",
+    "final_reveal": "If you turn the photo over again, new pencil writing has appeared: 'She was the first one who learned how to stay.'"
+  },
+  "letter": {
+    "id": "letter",
+    "title": "Letter from M. R. (Previous)",
+    "subtitle": "Folded three times, addressed to 'Elena' but never mailed",
+    "excerpts": [
+      "Elena,",
+      "I finished the catalog tonight. The client will be pleased. The house is 'clear' in the way they want.",
+      "There are fourteen previous intake forms in the study desk. All of them are signed by different people. All of them have my name as the 'Current Assignee' on the last line.",
+      "I keep hearing the radio even when it is off. It says the names of people who are not here.",
+      "I am coming home tomorrow. I love you. Tell the girls I will take them to the lake when this is done.",
+      "— M"
+    ],
+    "reveals": "The letter is dated three weeks ago. There is a small dried blood spot on the corner near the word 'home'."
+  },
+  "basement_note": {
+    "id": "basement_note",
+    "title": "Scratched into the concrete near the threshold",
+    "subtitle": "Made with something sharp. Multiple overlapping hands.",
+    "excerpts": [
+      "I tried the door 11 times.",
+      "Every time it opens into the same room I just left.",
+      "The water in the hole does not reflect me anymore.",
+      "If you can read this, you have already signed.",
+      "The next one will have it easier because of us."
+    ],
+    "reveals": "Below the writing, someone has carved a list of 17 names. Your name is the 15th. The last two are written in a child's hand."
+  },
+  "recorder": {
+    "id": "recorder",
+    "title": "Digital Voice Memo — 00:04:11",
+    "subtitle": "The device was already recording when you found it",
+    "excerpts": [
+      "[soft static, then a calm male voice, close to the mic]",
+      "If you are hearing this, you are standing in the bedroom right now. You just picked up the recorder.",
+      "Do not turn around. It does not like to be seen directly.",
+      "The flashlight helps for a while. When the battery dies, stand very still. It passes.",
+      "I tried to leave through the front door after clearing the basement. The porch was gone. There was only the hallway again.",
+      "I think the house is using us to... practice. Each time it gets a little better at pretending to be empty.",
+      "[long pause, breathing]",
+      "My name was Michael. If you make it out, tell Elena the girls should not come looking."
+    ],
+    "reveals": "The timestamp on the file properties says it was recorded 41 minutes from now."
+  }
+}

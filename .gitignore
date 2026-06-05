@@ -1,0 +1,30 @@
+# Godot 4+ specific
+.godot/
+export/
+*.tmp
+*.import
+
+# Build / export artifacts
+build/
+dist/
+export_presets.cfg
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Godot debug / logs
+*.log
+
+# Our own generated / temp
+data/temp/
+*.autosave
+
+# Keep data/ content but ignore large exports if we add them later
+# data/exports/

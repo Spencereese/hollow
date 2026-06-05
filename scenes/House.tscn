@@ -1,0 +1,39 @@
+[gd_scene load_steps=3 format=3 uid="uid://hollowhouse"]
+
+[ext_resource type="Script" path="res://scripts/House.gd" id="1_house"]
+[ext_resource type="Script" path="res://scripts/Player.gd" id="2_player"]
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 1
+background_color = Color(0.01, 0.008, 0.012, 1)
+fog_enabled = true
+fog_density = 0.07
+
+[node name="House" type="Node3D"]
+script = ExtResource("1_house")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="Player" type="CharacterBody3D" parent="."]
+script = ExtResource("2_player")
+
+[node name="Head" type="Node3D" parent="Player"]
+
+[node name="Camera3D" type="Camera3D" parent="Player/Head"]
+current = true
+fov = 72.0
+near = 0.08
+
+[node name="InteractRay" type="RayCast3D" parent="Player/Head/Camera3D"]
+enabled = true
+target_position = Vector3(0, 0, -3.8)
+collision_mask = 3
+
+[node name="Flashlight" type="SpotLight3D" parent="Player/Head/Camera3D"]
+light_color = Color(0.98, 0.95, 0.82, 1)
+light_energy = 1.9
+spot_range = 7.8
+spot_angle = 36.0
+spot_angle_attenuation = 1.8
+shadow_enabled = true
