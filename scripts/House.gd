@@ -4,18 +4,25 @@ extends Node3D
 # Focus on oppressive small-space realism: low ceilings, thick walls, limited sightlines, one moonlight shaft.
 
 # Relax strict inference warnings for this prototype (many local vars in builder code)
-# warning-ignore-all:inferred_declaration
-# warning-ignore-all:unsafe_method_access
-# warning-ignore-all:unsafe_property_access
+@warning_ignore("inferred_declaration")
+@warning_ignore("unsafe_method_access")
+@warning_ignore("unsafe_property_access")
 
 @export var build_on_ready: bool = true
 @export var show_debug_markers: bool = true  # turn off once layout is solid; helps describe positions precisely (see LAYOUT DEBUG in console)
 
 var _materials: Dictionary = {}
+var _textures: Dictionary = {}
 var _interactables: Array = []
 
 @onready var player: CharacterBody3D = $Player
 @onready var world_env: WorldEnvironment = $WorldEnvironment
+
+# Tech state for animated shaders / effects (driven by tension + events)
+var _anomaly_mat: ShaderMaterial
+var _tension: float = 0.0
+var _flicker_phase: float = 0.0
+var _current_watcher: Node3D = null  # for gaze-aware animation on the silhouette
 
 func _ready() -> void:
     print("[House] _ready() entered. player node exists: ", player != null)
@@ -33,45 +40,97 @@ func _ready() -> void:
         if AudioManager:
             AudioManager.start_ambient(0.28, 0.11)
 
+        # Wire tension for living shaders / flicker / particle response
+        if GameManager:
+            GameManager.tension_changed.connect(_on_tension_changed)
+            _tension = GameManager.tension
+
         print("[House] Level constructed. Welcome to the property. Player at: ", player.position if player else "N/A")
 
+func _load_textures() -> void:
+    var tex_paths := {
+        "plaster_wall": "res://assets/textures/plaster_wall.jpg",
+        "hardwood_floor": "res://assets/textures/hardwood_floor.jpg",
+        "dark_wood": "res://assets/textures/dark_wood.jpg",
+        "basement_concrete": "res://assets/textures/basement_concrete.jpg",
+        "worn_fabric": "res://assets/textures/worn_fabric.jpg",
+        "aged_metal": "res://assets/textures/aged_metal.jpg",
+    }
+    for key in tex_paths:
+        var img := Image.new()
+        if img.load(tex_paths[key]) == OK:
+            _textures[key] = ImageTexture.create_from_image(img)
+            print("[House] Loaded texture: ", key)
+        else:
+            print("[House] WARNING: Could not load texture ", tex_paths[key])
+
 func _create_materials() -> void:
-    # Plaster / drywall - cold and slightly stained (brighter for demo visibility)
+    _load_textures()
+
+    # Plaster / drywall - now with hyper-real texture
     var plaster: StandardMaterial3D = StandardMaterial3D.new()
-    plaster.albedo_color = Color(0.58, 0.56, 0.54)
-    plaster.roughness = 0.92
+    if _textures.has("plaster_wall"):
+        plaster.albedo_texture = _textures["plaster_wall"]
+        plaster.uv1_scale = Vector3(6.0, 2.8, 1.0)
+        plaster.uv1_triplanar = true
+    else:
+        plaster.albedo_color = Color(0.58, 0.56, 0.54)
+    plaster.roughness = 0.95
     plaster.metallic = 0.0
     _materials["plaster"] = plaster
 
-    # Old wood - dark, dry (brighter for demo)
+    # Old wood - dark, dry (with grain texture)
     var wood: StandardMaterial3D = StandardMaterial3D.new()
-    wood.albedo_color = Color(0.38, 0.32, 0.26)
-    wood.roughness = 0.85
+    if _textures.has("dark_wood"):
+        wood.albedo_texture = _textures["dark_wood"]
+        wood.uv1_scale = Vector3(2.5, 1.8, 1.0)
+        wood.uv1_triplanar = true
+    else:
+        wood.albedo_color = Color(0.38, 0.32, 0.26)
+    wood.roughness = 0.88
     wood.metallic = 0.02
     _materials["wood"] = wood
 
-    # Floor wood - warmer from foot traffic (brighter for demo)
+    # Floor wood - warmer from foot traffic (textured)
     var floor_wood: StandardMaterial3D = StandardMaterial3D.new()
-    floor_wood.albedo_color = Color(0.48, 0.40, 0.32)
-    floor_wood.roughness = 0.78
+    if _textures.has("hardwood_floor"):
+        floor_wood.albedo_texture = _textures["hardwood_floor"]
+        floor_wood.uv1_scale = Vector3(3.2, 2.4, 1.0)
+        floor_wood.uv1_triplanar = true
+    else:
+        floor_wood.albedo_color = Color(0.48, 0.40, 0.32)
+    floor_wood.roughness = 0.82
     _materials["floor_wood"] = floor_wood
 
-    # Concrete basement
+    # Concrete basement (textured)
     var concrete: StandardMaterial3D = StandardMaterial3D.new()
-    concrete.albedo_color = Color(0.31, 0.30, 0.29)
-    concrete.roughness = 0.95
+    if _textures.has("basement_concrete"):
+        concrete.albedo_texture = _textures["basement_concrete"]
+        concrete.uv1_scale = Vector3(2.0, 2.0, 1.0)
+        concrete.uv1_triplanar = true
+    else:
+        concrete.albedo_color = Color(0.31, 0.30, 0.29)
+    concrete.roughness = 0.97
     _materials["concrete"] = concrete
 
-    # Metal pipes / fixtures - cold
+    # Metal pipes / fixtures - cold (textured)
     var metal: StandardMaterial3D = StandardMaterial3D.new()
-    metal.albedo_color = Color(0.25, 0.26, 0.28)
-    metal.roughness = 0.35
-    metal.metallic = 0.7
+    if _textures.has("aged_metal"):
+        metal.albedo_texture = _textures["aged_metal"]
+        metal.uv1_scale = Vector3(4.0, 3.0, 1.0)
+    else:
+        metal.albedo_color = Color(0.25, 0.26, 0.28)
+    metal.roughness = 0.42
+    metal.metallic = 0.65
     _materials["metal"] = metal
 
-    # Fabric / old couch
+    # Fabric / old couch (textured)
     var fabric: StandardMaterial3D = StandardMaterial3D.new()
-    fabric.albedo_color = Color(0.18, 0.15, 0.16)
+    if _textures.has("worn_fabric"):
+        fabric.albedo_texture = _textures["worn_fabric"]
+        fabric.uv1_scale = Vector3(1.8, 1.6, 1.0)
+    else:
+        fabric.albedo_color = Color(0.18, 0.15, 0.16)
     fabric.roughness = 0.98
     _materials["fabric"] = fabric
 
@@ -90,6 +149,39 @@ func _create_materials() -> void:
     wrong.albedo_color = Color(0.12, 0.09, 0.11)
     wrong.roughness = 0.6
     _materials["wrong"] = wrong
+
+# Apply the custom shaders to the anomaly (ripples + pulse) and prepare corruption materials
+# on the important photo/document props. Called once after _build_geometry.
+func _apply_animated_materials() -> void:
+    # Anomaly water - the star technical set piece
+    var thresh := get_node_or_null("TheThreshold")
+    if thresh:
+        var water_mi := thresh.get_node_or_null("MeshInstance3D") as MeshInstance3D
+        if water_mi:
+            _anomaly_mat = ShaderMaterial.new()
+            _anomaly_mat.shader = load("res://shaders/anomaly_water.gdshader")
+            _anomaly_mat.set_shader_parameter("tension", _tension)
+            water_mi.material_override = _anomaly_mat
+            print("[House] Anomaly water shader applied (ripples + tension emission).")
+
+    # Prepare Polaroid (and similar) for runtime corruption animation using the upgraded corrupted asset
+    var photo := get_node_or_null("Polaroid")
+    if photo:
+        var pmi := photo.get_node_or_null("MeshInstance3D") as MeshInstance3D
+        if pmi and pmi.material_override is StandardMaterial3D:
+            # Keep reference to original; on flag we will swap to corruption shader + the corrupted tex
+            pmi.set_meta("original_mat", pmi.material_override.duplicate())
+            pmi.set_meta("corruptible", true)
+
+    # Intake form and Letter also get corruption-ready metadata for future mutations
+    for nname in ["IntakeForm", "Letter"]:
+        var n := get_node_or_null(nname)
+        if n:
+            var mi := n.get_node_or_null("MeshInstance3D") as MeshInstance3D
+            if mi:
+                mi.set_meta("corruptible", true)
+
+    print("[House] Animated material hooks ready (corruption on key props + anomaly).")
 
 func _add_wall(pos: Vector3, size: Vector3, mat_name: String = "plaster", rot: float = 0.0) -> StaticBody3D:
     var body := StaticBody3D.new()
@@ -138,6 +230,28 @@ func _add_cylinder(pos: Vector3, radius: float, height: float, mat: String, name
     if name != "": body.name = name
     add_child(body)
     return body
+
+# Helper: add a simple framed picture quad (visual storytelling prop) as a textured QuadMesh against a surface.
+func _add_framed_picture(pos: Vector3, size: Vector2, tex_path: String, rot_deg: Vector3, name: String) -> void:
+    var pic := MeshInstance3D.new()
+    pic.name = name
+    pic.mesh = QuadMesh.new()
+    pic.mesh.size = size
+    pic.position = pos
+    pic.rotation_degrees = rot_deg
+
+    var pmat := StandardMaterial3D.new()
+    var img := Image.new()
+    if img.load(tex_path) == OK:
+        pmat.albedo_texture = ImageTexture.create_from_image(img)
+        pmat.roughness = 0.65
+    else:
+        pmat.albedo_color = Color(0.4, 0.35, 0.3)
+        print("[House] WARNING: missing framed art texture ", tex_path)
+    pic.material_override = pmat
+    add_child(pic)
+
+    # (thin_frame param kept for future; current impl uses flat art quads for clean look against walls)
 
 func _build_geometry() -> void:
     # === FLOORS ===
@@ -322,6 +436,25 @@ func _build_geometry() -> void:
     add_child(photo_body)
     photo_body.add_to_group("interactable")
 
+    # === NEW HYPER-REAL FRAMED ART & PROPS for atmosphere ===
+    # Large mantel painting (the "wrong" landscape)
+    _add_framed_picture(Vector3(0.1, 2.55, 4.35), Vector2(1.35, 0.85), "res://assets/art/props/mantel_painting.jpg", Vector3(-2, 0, 0), "MantelPainting")
+
+    # Previous specialists group photo on side wall
+    _add_framed_picture(Vector3(5.25, 2.1, 0.2), Vector2(0.72, 0.55), "res://assets/art/props/previous_specialists.jpg", Vector3(0, 0, 90), "SpecialistsPhoto")
+
+    # Child's drawing taped near bedroom doorway (creepy innocent horror)
+    _add_framed_picture(Vector3(2.85, 2.35, 1.72), Vector2(0.48, 0.38), "res://assets/art/props/child_drawing.jpg", Vector3(-4, 3, -1), "ChildDrawing")
+
+    # Clearance / official notice near entrance
+    _add_framed_picture(Vector3(-1.55, 2.0, -2.35), Vector2(0.55, 0.72), "res://assets/art/props/clearance_notice.jpg", Vector3(8, 0, 0), "ClearanceNotice")
+
+    # Calendar on kitchen / left wall
+    _add_framed_picture(Vector3(-5.25, 2.4, 2.9), Vector2(0.42, 0.55), "res://assets/art/props/calendar_1976.jpg", Vector3(0, 0, -90), "Calendar1976")
+
+    # Newspaper clipping pinned (extra environmental storytelling)
+    _add_framed_picture(Vector3(5.22, 1.55, 3.6), Vector2(0.65, 0.48), "res://assets/art/props/newspaper_1976.jpg", Vector3(0, 0, 90), "NewspaperClip")
+
     # Intake form on entry table (near door) - use Note class
     var entry_table := _add_prop_box(Vector3(-1.4, 0.55, -1.6), Vector3(1.1, 0.65, 0.6), "wood", "EntryTable")
     var form_body := StaticBody3D.new()
@@ -377,27 +510,36 @@ func _build_geometry() -> void:
     add_child(recorder_body)
     recorder_body.add_to_group("interactable")
 
-    # Letter in "drawer" (use Note class)
+    # Letter / names list pad (use Note class) - now with hyper-real document texture
     var letter_body := StaticBody3D.new()
     letter_body.name = "Letter"
-    letter_body.position = Vector3(3.4, 0.15, 4.1)
-    letter_body.scale = Vector3(0.3, 0.08, 0.22)
+    letter_body.position = Vector3(3.4, 0.52, 4.05)
+    letter_body.rotation_degrees = Vector3(-82, 12, 8)  # lying somewhat flat on surface
+    letter_body.scale = Vector3(0.55, 0.02, 0.42)
     letter_body.collision_layer = 2
     letter_body.collision_mask = 0
     var let_shape := CollisionShape3D.new()
     var let_box := BoxShape3D.new()
-    let_box.size = Vector3(1.0, 0.2, 0.7)
+    let_box.size = Vector3(1.0, 0.6, 0.9)
     let_shape.shape = let_box
     letter_body.add_child(let_shape)
     var letter_mesh: MeshInstance3D = MeshInstance3D.new()
-    letter_mesh.mesh = BoxMesh.new()
-    letter_mesh.mesh.size = Vector3(1.0, 0.2, 0.7)
-    letter_mesh.material_override = _materials["wood"]
+    letter_mesh.mesh = QuadMesh.new()
+    letter_mesh.mesh.size = Vector2(1.6, 1.1)
+    var lmat := StandardMaterial3D.new()
+    var limg := Image.new()
+    if limg.load("res://assets/art/props/names_list_pad.jpg") == OK:
+        lmat.albedo_texture = ImageTexture.create_from_image(limg)
+    else:
+        lmat.albedo_color = Color(0.82, 0.76, 0.62)
+    lmat.roughness = 0.72
+    letter_mesh.material_override = lmat
     letter_body.add_child(letter_mesh)
     add_child(letter_body)
     letter_body.add_to_group("interactable")
 
     # Basement anomaly (the black water) - use Anomaly class
+    # Now uses custom animated water shader for rippling + tension-synced pulse (technical highlight)
     var anomaly_body := StaticBody3D.new()
     anomaly_body.name = "TheThreshold"
     anomaly_body.position = Vector3(0.3, -4.3, 7.8)
@@ -415,10 +557,27 @@ func _build_geometry() -> void:
     water.mesh.top_radius = 0.9
     water.mesh.bottom_radius = 0.9
     water.mesh.height = 0.3
-    water.material_override = _materials["black"]
+    # Will be replaced post-build with the animated shader material for maximum visual impact
+    water.material_override = _materials["black"].duplicate()
     anomaly_body.add_child(water)
     add_child(anomaly_body)
     anomaly_body.add_to_group("interactable")
+
+    # Carved names concrete "document" visual on basement floor near threshold (hyper-real horror payoff)
+    var carve := MeshInstance3D.new()
+    carve.name = "BasementCarvings"
+    carve.mesh = QuadMesh.new()
+    carve.mesh.size = Vector2(2.8, 2.1)
+    carve.position = Vector3(0.35, -4.48, 7.55)
+    carve.rotation_degrees = Vector3(-88, 4, 2)  # almost flat on floor, raked by light
+    var cmat := StandardMaterial3D.new()
+    var cimg := Image.new()
+    if cimg.load("res://assets/art/props/carved_concrete_names.jpg") == OK:
+        cmat.albedo_texture = ImageTexture.create_from_image(cimg)
+    cmat.roughness = 0.98
+    cmat.metallic = 0.0
+    carve.material_override = cmat
+    add_child(carve)
 
     # Pipes in basement for atmosphere
     _add_cylinder(Vector3(-1.8, -2.2, 5.8), 0.12, 2.8, "metal", "Pipe1")
@@ -481,13 +640,16 @@ func _build_geometry() -> void:
     var interactable_count = get_tree().get_nodes_in_group("interactable").size()
     print("[House] Geometry + props placed. %d interactables registered (via group)." % interactable_count)
 
+    # === POST-BUILD TECH UPGRADES (shaders + animated materials on key assets) ===
+    _apply_animated_materials()
+
     # Visual layout aids (spawned here so they exist early; positions are source-of-truth from build)
     if show_debug_markers:
         _spawn_layout_markers()
 
 func _spawn_layout_markers() -> void:
     # Bright, non-colliding, labeled reference markers. Colors:
-    # red = doors, yellow = the 6 key props, blue = wall planes/corners, green = stairs, magenta = porch/trim
+    # red = doors, yellow = key props + new art, blue = wall planes/corners, green = stairs, magenta = porch/trim
     var markers: Array = [
         {"pos": Vector3(0, 0.2, -2.55), "col": Color(0.95, 0.2, 0.2), "lbl": "FrontWallPlane"},
         {"pos": Vector3(-0.05, 0.2, -2.55), "col": Color(1, 0.15, 0.15), "lbl": "FrontDoor"},
@@ -508,6 +670,11 @@ func _spawn_layout_markers() -> void:
         {"pos": Vector3(-1.0, 0.4, -3.3), "col": Color(0.95, 0.45, 0.85), "lbl": "LPorchWall"},
         {"pos": Vector3(1.0, 0.4, -3.3), "col": Color(0.95, 0.45, 0.85), "lbl": "RPorchWall"},
         {"pos": Vector3(4.0, 1.0, 1.55), "col": Color(0.6, 0.85, 0.6), "lbl": "BedroomDoorway"},
+        # New art props (yellowish for visual clutter)
+        {"pos": Vector3(0.1, 2.55, 4.35), "col": Color(0.95, 0.85, 0.3), "lbl": "MantelPainting"},
+        {"pos": Vector3(5.25, 2.1, 0.2), "col": Color(0.95, 0.85, 0.3), "lbl": "SpecialistsPhoto"},
+        {"pos": Vector3(2.85, 2.35, 1.72), "col": Color(0.95, 0.85, 0.3), "lbl": "ChildDrawing"},
+        {"pos": Vector3(0.35, -4.48, 7.55), "col": Color(0.95, 0.85, 0.3), "lbl": "BasementCarvings"},
     ]
     for mdef in markers:
         var m := MeshInstance3D.new()
@@ -549,6 +716,11 @@ func _add_lighting_and_fog() -> void:
     env.adjustment_enabled = true
     env.adjustment_contrast = 1.08
     env.adjustment_saturation = 0.82
+    # Glow + a touch of SSAO-like feel via fog + adjustment for that "technically modern" Godot 4 look
+    env.glow_enabled = true
+    env.glow_intensity = 0.55
+    env.glow_bloom = 0.12
+    env.glow_hdr_threshold = 0.85
     world_env.environment = env
 
     # Moonlight shaft from "window" high on back wall (living room)
@@ -625,10 +797,11 @@ func _add_particles() -> void:
     dust.draw_pass_1 = draw
     add_child(dust)
 
-    # Very subtle "moth" or floating specks near anomaly (creepy)
+    # Very subtle "moth" or floating specks near anomaly (creepy) — now tension reactive for more dread
     var moths := GPUParticles3D.new()
+    moths.name = "Moths"
     moths.position = Vector3(0.3, -3.9, 7.2)
-    moths.amount = 12
+    moths.amount = 14
     moths.lifetime = 6.5
     var mmat := ParticleProcessMaterial.new()
     mmat.direction = Vector3(0.1, 0.3, 0.0)
@@ -713,7 +886,7 @@ func _setup_player() -> void:
     print("[House] Interactables (global pos):")
     for n in get_tree().get_nodes_in_group("interactable"):
         print("  ", n.name, " @ ", n.global_position)
-    print("[House] Debug markers (if House.show_debug_markers=true): 19 hovering emissive spheres w/ labels are in the scene. Look for 'FrontDoor', 'Polaroid', 'NWCorner' etc while playing to give precise feedback.")
+    print("[House] Debug markers (if House.show_debug_markers=true): hovering emissive spheres w/ labels (incl. new art like MantelPainting, BasementCarvings). Look for 'FrontDoor', 'Polaroid', 'NWCorner' etc while playing to give precise feedback.")
     print("[House] === END LAYOUT DEBUG ===")
 
 func _wire_events() -> void:
@@ -733,10 +906,32 @@ func _wire_events() -> void:
 func _on_note_collected(note_id: String, _title: String) -> void:
     if note_id == "polaroid" and GameManager:
         GameManager.set_flag("painting_corrupted")
-        # Also corrupt the physical photo a bit more if possible
+        # Technically impressive: swap to corrupted asset + animate the burn/distort shader on the physical prop
         var photo := get_node_or_null("Polaroid")
-        if photo and photo.has_method("set_corrupted"):
-            photo.set_corrupted(true)
+        if photo:
+            # Robust find (the MeshInstance3D may not be named exactly that in the tree)
+            var pmi: MeshInstance3D = null
+            for c in photo.get_children():
+                if c is MeshInstance3D:
+                    pmi = c
+                    break
+            if pmi:
+                var cmat := ShaderMaterial.new()
+                cmat.shader = load("res://shaders/prop_corruption.gdshader")
+                # Load the upgraded corrupted polaroid we generated
+                var cimg := Image.new()
+                if cimg.load("res://assets/art/family_polaroid_corrupted.jpg") == OK:
+                    cmat.set_shader_parameter("albedo_tex", ImageTexture.create_from_image(cimg))
+                cmat.set_shader_parameter("corrupt", 0.0)
+                pmi.material_override = cmat
+                # Animate the corruption reveal (the "house corrupts the memory")
+                var tw := create_tween()
+                tw.tween_method(func(v: float): cmat.set_shader_parameter("corrupt", v), 0.0, 1.0, 2.4)
+                # Small ash-like particle puff for the moment the face "melts"
+                _spawn_corruption_puff(photo.global_position + Vector3(0, 0.3, 0))
+        # Fill out dynamic world marks using the new decal assets (technically impressive projected details that appear as you read)
+        _add_decal("res://assets/art/decals/handprint_decal.jpg", Vector3(-0.8, 1.6, 3.9), Vector3(0,0,1), Vector3(1.2, 1.2, 2.5))
+        _add_decal("res://assets/art/decals/carved_overlay_decal.jpg", Vector3(0.4, 1.0, 4.2), Vector3(0,0,1), Vector3(0.9, 0.7, 2.0))
 
     if note_id == "intake_form":
         # After reading the form, the house "notices" you
@@ -745,6 +940,14 @@ func _on_note_collected(note_id: String, _title: String) -> void:
         get_tree().create_timer(2.8).timeout.connect(func():
             if AudioManager: AudioManager.play_whisper_swell(1.6)
         )
+
+    if note_id == "letter":
+        # The previous specialist's letter leaves a mark
+        _add_decal("res://assets/art/decals/water_stain_decal.jpg", Vector3(3.2, 1.0, 4.1), Vector3(0,0,-1), Vector3(0.8, 0.6, 1.5))
+
+    if note_id == "basement_note":
+        # Already handled some in the match, but ensure a strong mark near the threshold
+        _add_decal("res://assets/art/decals/mold_decal.jpg", Vector3(1.8, -3.8, 6.8), Vector3(0,1,0), Vector3(1.8, 1.4, 2.5))
 
 func _on_world_event(event_name: String) -> void:
     match event_name:
@@ -784,50 +987,84 @@ func _basement_entered() -> void:
     _spawn_watcher_silhouette()
 
 func _spawn_watcher_silhouette() -> void:
-    var w := MeshInstance3D.new()
+    # Technically upgraded watcher: multi-part silhouette + breathing + gaze avoidance.
+    # The house "knows" when you are looking and slowly turns the head away — pure implication horror.
+    var w := Node3D.new()
     w.name = "Watcher"
     w.position = Vector3(1.4, 0.4, 1.2)
     w.rotation_degrees = Vector3(0, -35, 0)
-
-    var body := CylinderMesh.new()
-    body.top_radius = 0.22
-    body.bottom_radius = 0.28
-    body.height = 2.1
-    var mat := StandardMaterial3D.new()
-    mat.albedo_color = Color(0.02, 0.015, 0.018)
-    mat.roughness = 1.0
-    w.mesh = body
-    w.material_override = mat
     add_child(w)
+    _current_watcher = w
 
-    # Head
-    var head_m := SphereMesh.new()
-    head_m.radius = 0.26
+    var dark := StandardMaterial3D.new()
+    dark.albedo_color = Color(0.015, 0.012, 0.016)
+    dark.roughness = 1.0
+
+    # Taller, slightly irregular torso (more human silhouette)
+    var body := MeshInstance3D.new()
+    body.mesh = CylinderMesh.new()
+    body.mesh.top_radius = 0.21
+    body.mesh.bottom_radius = 0.29
+    body.mesh.height = 2.05
+    body.material_override = dark
+    w.add_child(body)
+
+    # Head (separate for rotation / "look away")
     var head := MeshInstance3D.new()
-    head.mesh = head_m
-    head.position = Vector3(0, 1.25, 0)
-    head.material_override = mat
+    head.name = "Head"
+    head.mesh = SphereMesh.new()
+    head.mesh.radius = 0.255
+    head.position = Vector3(0, 1.22, 0)
+    head.material_override = dark
     w.add_child(head)
 
-    # Two tiny "eye" dots (emissive)
-    for x_off in [-0.11, 0.11]:
+    # Emissive "eyes" (the only bright thing — very effective)
+    for x_off in [-0.105, 0.105]:
         var eye := MeshInstance3D.new()
         eye.mesh = SphereMesh.new()
-        eye.mesh.radius = 0.035
-        var eye_mat := StandardMaterial3D.new()
-        eye_mat.albedo_color = Color(0.9, 0.92, 0.95)
-        eye_mat.emission_enabled = true
-        eye_mat.emission = Color(0.6, 0.65, 0.7)
-        eye_mat.emission_energy_multiplier = 0.4
-        eye.material_override = eye_mat
-        eye.position = Vector3(x_off, 1.32, -0.22)
+        eye.mesh.radius = 0.034
+        var em := StandardMaterial3D.new()
+        em.albedo_color = Color(0.92, 0.93, 0.96)
+        em.emission_enabled = true
+        em.emission = Color(0.55, 0.62, 0.72)
+        em.emission_energy_multiplier = 0.55
+        eye.material_override = em
+        eye.position = Vector3(x_off, 1.29, -0.20)
         head.add_child(eye)
 
-    # Remove after short time or when player gets close
-    get_tree().create_timer(1.9).timeout.connect(func():
+    # Breathing scale loop (slow, sick)
+    var breathe := create_tween().set_loops()
+    breathe.tween_property(w, "scale:y", 1.03, 1.8).set_trans(Tween.TRANS_SINE)
+    breathe.tween_property(w, "scale:y", 0.97, 2.1).set_trans(Tween.TRANS_SINE)
+
+    # Gaze avoidance timer (the technically impressive "it knows you're looking" bit)
+    var gaze_t := Timer.new()
+    gaze_t.wait_time = 0.25
+    gaze_t.autostart = true
+    gaze_t.timeout.connect(func():
+        if not is_instance_valid(w) or not GameManager or not player:
+            return
+        var to_p := (player.global_position - w.global_position).normalized()
+        var fwd := -w.global_transform.basis.z
+        var dot := fwd.dot(to_p)
+        var head_n := head
+        if dot > 0.65 and head_n:  # player is looking roughly at it
+            # Slowly turn the head away (and a bit of body)
+            var avoid := create_tween()
+            avoid.tween_property(head_n, "rotation_degrees:y", head_n.rotation_degrees.y + 28.0 * sign(randf() - 0.5), 1.6)
+            if w.rotation_degrees.y > -80:
+                var b_avoid := create_tween()
+                b_avoid.tween_property(w, "rotation_degrees:y", w.rotation_degrees.y - 6.0, 2.2)
+    )
+    w.add_child(gaze_t)
+
+    # Remove after short time or when player gets close (with nicer dissolve)
+    get_tree().create_timer(2.1).timeout.connect(func():
         if is_instance_valid(w):
+            _current_watcher = null
             var fade := create_tween()
-            fade.tween_property(w, "modulate:a", 0.0, 0.4)
+            fade.tween_property(w, "modulate:a", 0.0, 0.55)
+            fade.parallel().tween_property(w, "scale", w.scale * 0.6, 0.7)
             fade.finished.connect(w.queue_free)
     )
 
@@ -838,3 +1075,114 @@ func play_creak_at(pos: Vector3, intensity: float = 0.8) -> void:
 func _on_demo_end(_reason: String) -> void:
     # The Main scene handles the actual fade + text
     pass
+
+func _on_tension_changed(t: float) -> void:
+    _tension = clamp(t, 0.0, 1.0)
+    if _anomaly_mat:
+        _anomaly_mat.set_shader_parameter("tension", _tension)
+    # Future: could also modulate some living wall breathe_amp here
+
+func _process(delta: float) -> void:
+    # Drive technical effects that sell "the house is alive"
+    _flicker_phase += delta * 1.7
+
+    # Cheap but effective light flicker on several named lights (moon, entry, ceiling, broken, red)
+    var lights := ["Moon", "EntryFill", "CeilingLight", "BrokenLamp", "red_glow"]
+    for lname in lights:
+        var l := get_node_or_null(lname) as Light3D
+        if l and is_instance_valid(l):
+            var base := 0.9 if lname == "Moon" else (0.8 if lname == "EntryFill" else (0.6 if lname == "CeilingLight" else (0.0 if lname == "BrokenLamp" else 0.08)))
+            # Multi-frequency noise-like flicker, stronger on high tension
+            var f := sin(_flicker_phase * 1.3) * 0.035 + sin(_flicker_phase * 3.7 + 1.2) * 0.018
+            f += (randf() - 0.5) * 0.012 * (0.6 + _tension * 1.4)
+            l.light_energy = max(0.0, base + f * (0.7 + _tension * 1.8))
+
+    # Push tension into anomaly shader if present (already done via signal but safe)
+    if _anomaly_mat:
+        _anomaly_mat.set_shader_parameter("tension", _tension)
+
+    # Drive environment glow with tension for "the house is waking up" visual payoff
+    if world_env and world_env.environment:
+        world_env.environment.glow_intensity = 0.55 + _tension * 0.65
+
+    # Moths and ambient particles get more active with dread (cheap but effective)
+    var moths := get_node_or_null("Moths") as GPUParticles3D
+    if moths:
+        moths.amount = int(lerp(14, 38, _tension))
+
+    # Subtle living house: if we had converted some walls to shader we could drive breathe here.
+    # For now the flicker + anomaly + (later) prop mutations sell the tech.
+
+func _hash(s: String) -> float:
+    var h := 0.0
+    for i in s.length():
+        h += float(s.unicode_at(i))
+    return fmod(h, 6.28)
+
+# Cheap one-shot particle puff when a memory/photo is corrupted by the house.
+# Uses the existing dust quad style for consistency (self-contained).
+func _spawn_corruption_puff(pos: Vector3) -> void:
+    var p := GPUParticles3D.new()
+    p.position = pos
+    p.amount = 18
+    p.lifetime = 1.1
+    p.emitting = true
+    p.one_shot = true
+
+    var mat := ParticleProcessMaterial.new()
+    mat.direction = Vector3(0, 1, 0)
+    mat.spread = 65.0
+    mat.gravity = Vector3(0, -0.6, 0)
+    mat.initial_velocity_min = 0.6
+    mat.initial_velocity_max = 1.4
+    mat.scale_min = 0.018
+    mat.scale_max = 0.04
+    mat.color = Color(0.08, 0.05, 0.04, 0.65)
+    p.process_material = mat
+
+    var q := QuadMesh.new()
+    q.size = Vector2(0.05, 0.05)
+    p.draw_pass_1 = q
+    add_child(p)
+
+    # Auto clean
+    get_tree().create_timer(2.0).timeout.connect(func():
+        if is_instance_valid(p): p.queue_free()
+    )
+
+# Helper to fill out and use the new decal assets as dynamic projected marks on the world.
+# This makes reading notes cause permanent (for the playthrough) environmental changes — the house "remembers" and marks you.
+# Uses Godot 4 Decal for technically impressive, easy projected details without editing meshes.
+func _add_decal(tex_path: String, pos: Vector3, normal: Vector3, size: Vector3 = Vector3(1.5, 1.5, 2.0)) -> void:
+    var decal := Decal.new()
+    decal.name = "Decal_" + tex_path.get_file().get_basename()
+    decal.size = size
+
+    var img := Image.new()
+    if img.load(tex_path) == OK:
+        var tex := ImageTexture.create_from_image(img)
+        decal.texture_albedo = tex
+    else:
+        print("[House] WARNING: could not load decal texture ", tex_path)
+        return
+
+    decal.position = pos
+    # Orient the decal projection along the given normal (e.g. wall forward)
+    if normal.length() > 0.01:
+        var up := Vector3.UP
+        if abs(normal.dot(up)) > 0.95:
+            up = Vector3.FORWARD
+        decal.look_at(pos + normal * 0.5, up)
+
+    # Slight random rotation for organic feel on repeated spawns
+    decal.rotate(normal, (randf() - 0.5) * 0.4)
+
+    add_child(decal)
+
+    # Simple "appear" animation by scaling up from tiny (feels like the mark manifesting)
+    decal.scale = Vector3(0.05, 0.05, 1.0)
+    var tw := create_tween()
+    tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+    tw.tween_property(decal, "scale", Vector3(1, 1, 1), 1.8)
+
+    print("[House] Spawned decal from ", tex_path, " at ", pos)

@@ -4,7 +4,7 @@ extends Node3D
 # This is the "real" main scene after menu.
 
 # Relax strict inference warnings for this prototype (UI builder code)
-# warning-ignore-all:inferred_declaration
+@warning_ignore("inferred_declaration")
 
 var house_container: Node = null
 
@@ -12,6 +12,8 @@ var note_reader: Control
 var journal_panel: Control
 var hud: Control
 var pause_menu: Control
+var postfx_rect: ColorRect
+var postfx_mat: ShaderMaterial
 
 var note_title_label: Label
 var note_body_label: RichTextLabel
@@ -19,6 +21,7 @@ var note_reveal_label: RichTextLabel
 
 var _is_paused: bool = false
 var _journal_open: bool = false
+var _current_tension: float = 0.0
 
 func _ready() -> void:
     # Instance the heavy House scene (code-built)
@@ -41,11 +44,13 @@ func _ready() -> void:
     _build_note_reader(ui_layer)
     _build_journal(ui_layer)
     _build_pause_menu(ui_layer)
+    _build_postfx(ui_layer)
 
     # Connect GameManager signals for global reactions
     if GameManager:
         GameManager.demo_ended.connect(_on_demo_ended)
         GameManager.note_collected.connect(_on_note_collected_for_hud)
+        GameManager.tension_changed.connect(_on_tension_changed)
 
     # Mouse capture is now handled in Player.gd (starts visible, click-to-capture for macOS compatibility).
     # Do not force CAPTURED here.
@@ -194,6 +199,20 @@ func _build_note_reader(parent: Node) -> void:
     bg.set_anchors_preset(Control.PRESET_FULL_RECT)
     note_reader.add_child(bg)
 
+    # Use the filled-out aged paper texture for a more physical, document-like feel (layered behind the clipboard)
+    var paper := TextureRect.new()
+    paper.name = "PaperBG"
+    paper.set_anchors_preset(Control.PRESET_FULL_RECT)
+    var pimg := Image.new()
+    if pimg.load("res://assets/ui/aged_paper.jpg") == OK:
+        paper.texture = ImageTexture.create_from_image(pimg)
+        paper.stretch_mode = TextureRect.STRETCH_TILE
+        paper.modulate = Color(0.95, 0.9, 0.82, 0.55)  # subtle tint so text stays readable
+    else:
+        paper.visible = false
+    note_reader.add_child(paper)
+    note_reader.move_child(paper, 1)  # above the solid dark bg
+
     # "Clipboard" panel
     var panel: PanelContainer = PanelContainer.new()
     panel.name = "PanelContainer"
@@ -286,6 +305,16 @@ func show_note_reader(title: String, lines: Array, reveal_text: String, note_id:
     # Deepen vignette a little
     _set_vignette(0.35)
 
+    # Tiny technical polish: pop the clipboard panel in (makes reading the upgraded photo/doc assets feel physical)
+    var panel: PanelContainer = note_reader.get_node_or_null("PanelContainer") as PanelContainer
+    if panel:
+        panel.scale = Vector2(0.92, 0.92)
+        panel.modulate.a = 0.6
+        var tw := create_tween()
+        tw.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+        tw.tween_property(panel, "scale", Vector2(1, 1), 0.22)
+        tw.parallel().tween_property(panel, "modulate:a", 1.0, 0.18)
+
 func _close_note_reader() -> void:
     if note_reader:
         note_reader.visible = false
@@ -303,6 +332,20 @@ func _build_journal(parent: Node) -> void:
     bg.color = Color(0.01, 0.008, 0.012, 0.94)
     bg.set_anchors_preset(Control.PRESET_FULL_RECT)
     journal_panel.add_child(bg)
+
+    # Filled UI asset: journal cover / aged paper layer for the notes screen
+    var cover := TextureRect.new()
+    cover.name = "JournalCover"
+    cover.set_anchors_preset(Control.PRESET_FULL_RECT)
+    var cimg := Image.new()
+    if cimg.load("res://assets/ui/journal_cover.jpg") == OK:
+        cover.texture = ImageTexture.create_from_image(cimg)
+        cover.stretch_mode = TextureRect.STRETCH_SCALE
+        cover.modulate = Color(0.7, 0.65, 0.58, 0.35)
+    else:
+        cover.visible = false
+    journal_panel.add_child(cover)
+    journal_panel.move_child(cover, 1)
 
     var title: Label = Label.new()
     title.text = "YOUR NOTES — Property Relocation Division"
@@ -408,6 +451,24 @@ func _build_pause_menu(parent: Node) -> void:
     quit.pressed.connect(_quit_to_menu)
     pause_menu.add_child(quit)
 
+func _build_postfx(parent: Node) -> void:
+    # Full-screen tension-driven post-processing overlay.
+    # Uses custom shader for film grain, breathing vignette, chromatic fringe and cold color drain.
+    # This + upgraded assets + procedural audio makes the demo feel technically rich.
+    postfx_rect = ColorRect.new()
+    postfx_rect.name = "TensionPostFX"
+    postfx_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+    postfx_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    postfx_rect.color = Color(1, 1, 1, 1)  # shader does the real work
+    parent.add_child(postfx_rect)
+
+    postfx_mat = ShaderMaterial.new()
+    postfx_mat.shader = load("res://shaders/screen_tension_postfx.gdshader")
+    postfx_mat.set_shader_parameter("tension", 0.0)
+    postfx_mat.set_shader_parameter("vignette_strength", 0.0)
+    postfx_mat.set_shader_parameter("grain_amount", 0.32)
+    postfx_rect.material = postfx_mat
+
 func _toggle_pause() -> void:
     _is_paused = not _is_paused
     pause_menu.visible = _is_paused
@@ -452,11 +513,22 @@ func _on_note_collected_for_hud(_id: String, _title: String) -> void:
             tw.tween_property(v, "color:a", 0.22, 0.15)
             tw.tween_property(v, "color:a", 0.0, 1.4)
 
+func _on_tension_changed(new_t: float) -> void:
+    _current_tension = clamp(new_t, 0.0, 1.0)
+    if postfx_mat:
+        postfx_mat.set_shader_parameter("tension", _current_tension)
+        # Grain and vignette breathe with dread
+        postfx_mat.set_shader_parameter("grain_amount", 0.28 + _current_tension * 0.38)
+        postfx_mat.set_shader_parameter("vignette_strength", _current_tension * 0.55)
+
 func _set_vignette(alpha: float) -> void:
     if not hud: return
     var v: ColorRect = hud.get_node_or_null("Vignette")
     if v:
         v.color.a = alpha
+    # Also push a bit into the postfx overlay for unified tech look
+    if postfx_mat:
+        postfx_mat.set_shader_parameter("vignette_strength", max(postfx_mat.get_shader_parameter("vignette_strength"), alpha * 0.7))
 
 func _on_demo_ended(reason: String) -> void:
     # Let the end sequence play out, then show final card
@@ -465,16 +537,32 @@ func _on_demo_ended(reason: String) -> void:
     )
 
 func play_end_sequence() -> void:
-    # Called by Anomaly
+    # Called by Anomaly — make it technically and emotionally overwhelming.
     if AudioManager:
         AudioManager.play_end_sequence()
-    # Kill most lights
+
+    # Max tension + postfx takeover
+    if GameManager:
+        GameManager.set_tension(1.0)
+    if postfx_mat:
+        postfx_mat.set_shader_parameter("tension", 1.0)
+        postfx_mat.set_shader_parameter("grain_amount", 0.7)
+        postfx_mat.set_shader_parameter("vignette_strength", 0.95)
+
+    # Kill most lights with dramatic timing
     var house: Node = get_node_or_null("House")
     if house:
         for light in house.get_children():
             if light is Light3D and light.name != "TheThreshold":
                 var tw: Tween = create_tween()
                 tw.tween_property(light, "light_energy", 0.0, 1.2 + randf() * 0.8)
+
+    # Extra: push the player toward the threshold visually if possible (subtle forced lean)
+    if house:
+        var p := house.get_node_or_null("Player") as CharacterBody3D
+        if p:
+            var tw2 := create_tween()
+            tw2.tween_property(p, "rotation_degrees:y", p.rotation_degrees.y + 6.0, 4.5)
 
 func _show_final_screen(_reason: String) -> void:
     var end: Control = Control.new()

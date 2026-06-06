@@ -1,7 +1,7 @@
 extends Interactable
 # Anomaly - The black water / threshold in the basement. The point of no return.
 
-# warning-ignore-all:inferred_declaration
+@warning_ignore("inferred_declaration")
 
 @export var prompt_text: String = "E — Reach into the water"
 

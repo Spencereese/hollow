@@ -3,7 +3,7 @@ extends Node3D
 # Base class for all examinable objects in HOLLOW.
 # Provides hover highlight, prompt, and a virtual interact().
 
-# warning-ignore-all:inferred_declaration
+@warning_ignore("inferred_declaration")
 
 @export var prompt_text: String = "E — Examine"
 @export var one_shot: bool = false

@@ -1,7 +1,7 @@
 extends Interactable
 # RadioInteractable - The old tube radio that delivers one of the strongest narrative beats.
 
-# warning-ignore-all:inferred_declaration
+@warning_ignore("inferred_declaration")
 
 @export var note_id: String = "recorder"  # we reuse the recorder text block for the broadcast
 

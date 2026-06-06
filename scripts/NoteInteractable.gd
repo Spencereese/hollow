@@ -2,7 +2,7 @@ extends Interactable
 # NoteInteractable - Physical object that opens the document reader when examined.
 # Uses data/notes.json via GameManager. Supports "corrupted" state for some notes.
 
-# warning-ignore-all:inferred_declaration
+@warning_ignore("inferred_declaration")
 
 @export var note_id: String = "intake_form"
 @export var initial_prompt: String = "E — Read document"

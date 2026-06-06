@@ -9,6 +9,8 @@ A short first-person psychological horror demo built in Godot 4 to showcase atmo
 
 You can launch HOLLOW no matter what directory your terminal is currently in.
 
+### macOS / Linux
+
 **Easiest (copy-paste these lines):**
 
 ```bash
@@ -35,15 +37,41 @@ For even faster access, there is now a symlink in your home directory:
 ~/launch-hollow
 ```
 
-The launcher always forces a completely fresh game state (no progress carry-over) — this is intentional for the horror experience.
+### Windows (PowerShell)
 
-By default it preserves the `.godot` cache for quicker startup. If you edit scripts and see weird stale errors, force a clean import with:
+**Easiest:**
 
-```bash
-CLEAN=1 ~/launch-hollow
+```powershell
+cd C:\Users\PC\Projects\hollow
+.\launch_hollow.ps1
 ```
 
-Godot 4.3+ is required. The path to the Godot binary is hardcoded in `launch_hollow.sh`. If it can't find Godot it will print instructions to open the folder manually in the Godot app instead.
+**From inside another project folder:**
+
+```powershell
+cd ..\hollow
+.\launch_hollow.ps1
+```
+
+**Run directly with full path:**
+
+```powershell
+C:\Users\PC\Projects\hollow\launch_hollow.ps1
+```
+
+There is also `launch_hollow.bat` for double-click convenience from Explorer (it calls the .ps1).
+
+**Force a clean reimport** (after script changes that cause stale cache issues):
+
+```powershell
+.\launch_hollow.ps1 -Clean
+```
+
+The launcher always forces a completely fresh game state (no progress carry-over) — this is intentional for the horror experience.
+
+By default it preserves the `.godot` cache for quicker startup. If you edit scripts and see weird stale errors, force a clean import with the `-Clean` flag (Windows) or `CLEAN=1` (macOS/Linux).
+
+Godot 4.6+ is required. The scripts attempt to auto-detect a Godot executable in common locations and PATH. If it can't find Godot it will print instructions to open the folder manually in the Godot app instead (easiest: drag the `hollow` folder onto your Godot.exe, or use Project > Open Project in the editor).
 
 ## Controls
 
@@ -63,6 +91,7 @@ Godot 4.3+ is required. The path to the Godot binary is hardcoded in `launch_hol
 - **First-person systems**: proper head bob, flashlight with realistic battery + cone decay + heavy flicker when dying, interaction ray + prompt, sprint, journal re-read system.
 - **Atmosphere first**: thick distance fog, limited moonlight shaft, dust particles, one real-time shadowed flashlight, cold color grading, and a "watcher" that appears only when you are not looking directly at it for long.
 - **Data-driven content**: all text lives in `data/notes.json` so writers or AI can edit the horror without touching code.
+- **Hyper-realistic art direction**: 6 seamless PBR-style surface textures (plaster, hardwood, concrete, wood trim, fabric, metal) + 9+ new photoreal props (carved names, newspaper, calendar, child's drawing, group photos, paintings, notices) loaded at runtime into the procedural level for rich detail without imported 3D meshes.
 - **Clean architecture**: GameManager singleton for state + flags + tension, signals for loose coupling, separate AudioManager, Player, Interactable base class.
 
 ## The Story (No Spoilers)
