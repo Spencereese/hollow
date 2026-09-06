@@ -51,7 +51,7 @@ func _ready() -> void:
 
     # Build the first-person viewmodel (hands + grip). This + shaders + upgraded assets = technically impressive.
     _build_viewmodel()
-    _attach_flashlight_particles()  # godray dust in the beam — huge technical + atmosphere win
+    _attach_flashlight_particles()  # godray dust in the beam â€” huge technical + atmosphere win
 
     # On macOS (and often other platforms), forcing CAPTURED immediately in _ready frequently fails to grab the cursor
     # until the user has clicked inside the game window. Start with visible mouse; we'll capture on first click.
@@ -66,8 +66,9 @@ func _ready() -> void:
 
     # Connect to GameManager for battery etc.
     if GameManager:
-        GameManager.flashlight_battery = 1.0
         GameManager.has_flashlight = true
+        if not GameManager.pending_continue:
+            GameManager.flashlight_battery = 1.0
 
     # Initial flashlight (full power at spawn) - stronger for demo visibility
     if flashlight:
@@ -82,10 +83,10 @@ func _ready() -> void:
         ray.target_position = Vector3(0, 0, -3.8)
         ray.collision_mask = 1 | 2  # walls + interactables
 
-    print("[Player] Ready. Mouse starts visible — click or move mouse in the 3D view to capture for looking. F toggles light, E interacts.")
+    print("[Player] Ready. Mouse starts visible â€” click or move mouse in the 3D view to capture for looking. F toggles light, E interacts.")
 
 func _unhandled_input(event: InputEvent) -> void:
-    # Click-to-capture (or motion) for mouse look — required on macOS for reliable cursor grab.
+    # Click-to-capture (or motion) for mouse look â€” required on macOS for reliable cursor grab.
     if not _mouse_captured:
         if (event is InputEventMouseButton and event.pressed) or event is InputEventMouseMotion:
             capture_mouse(true)
@@ -289,7 +290,7 @@ func _try_interact() -> void:
             var ms_r: Node = get_tree().current_scene
             if ms_r and ms_r.has_method("show_note_reader"):
                 ms_r.show_note_reader(
-                    "AM Band — 193 kHz (bleeding through)",
+                    "AM Band â€” 193 kHz (bleeding through)",
                     data_r.get("excerpts", []),
                     data_r.get("reveals", ""),
                     "recorder"
@@ -336,7 +337,7 @@ func _try_interact() -> void:
                 if AudioManager:
                     AudioManager.play_creak(0.35)
                 return
-            # Already unlocked — nudge further open if still mostly shut
+            # Already unlocked â€” nudge further open if still mostly shut
             if abs(collider.rotation_degrees.y) < 40.0:
                 collider.rotation_degrees.y = -55.0
                 if AudioManager:
@@ -452,7 +453,7 @@ func _build_viewmodel() -> void:
     palm.rotation_degrees = Vector3(18, 8, -12)
     _viewmodel.add_child(palm)
 
-    # Fingers (4 + thumb) — loose natural hold pose for gripping the light
+    # Fingers (4 + thumb) â€” loose natural hold pose for gripping the light
     var finger_mat = skin
     for i in 4:
         var f := MeshInstance3D.new()

@@ -57,6 +57,14 @@ func _ready() -> void:
 
     print("[Main] HOLLOW in-game ready. Explore carefully. House children: ", house_container.get_child_count() if house_container else 0)
 
+    # Wire GameManager refs + apply Continue restore (R3 save/load)
+    if GameManager and house_container:
+        GameManager.world = house_container
+        if house_container.has_node("Player"):
+            GameManager.player = house_container.get_node("Player")
+        if GameManager.pending_continue:
+            call_deferred("_apply_continue_state")
+
 func _build_hud(parent: Node) -> void:
     hud = Control.new()
     hud.name = "HUD"
@@ -413,7 +421,7 @@ func _build_journal(parent: Node) -> void:
     journal_panel.move_child(cover, 1)
 
     var title: Label = Label.new()
-    title.text = "YOUR NOTES — Property Relocation Division"
+    title.text = "YOUR NOTES â€” Property Relocation Division"
     title.position = Vector2(80, 40)
     title.add_theme_font_size_override("font_size", 20)
     journal_panel.add_child(title)
@@ -509,9 +517,16 @@ func _build_pause_menu(parent: Node) -> void:
     reset.pressed.connect(_restart_demo)
     pause_menu.add_child(reset)
 
+    var save_btn: Button = Button.new()
+    save_btn.text = "Save Progress"
+    save_btn.position = Vector2(540, 440)
+    save_btn.size = Vector2(200, 42)
+    save_btn.pressed.connect(_save_progress)
+    pause_menu.add_child(save_btn)
+
     var quit: Button = Button.new()
     quit.text = "Quit to Menu"
-    quit.position = Vector2(540, 440)
+    quit.position = Vector2(540, 500)
     quit.size = Vector2(200, 42)
     quit.pressed.connect(_quit_to_menu)
     pause_menu.add_child(quit)
@@ -553,10 +568,12 @@ func _restart_demo() -> void:
     get_tree().paused = false
     if GameManager:
         GameManager.reset_for_new_game()
+        GameManager.delete_save()
     get_tree().reload_current_scene()
 
 func _quit_to_menu() -> void:
     get_tree().paused = false
+    _save_progress()
     get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
 
 func _input(event: InputEvent) -> void:
@@ -602,7 +619,7 @@ func _on_demo_ended(reason: String) -> void:
     )
 
 func play_end_sequence() -> void:
-    # Called by Anomaly — make it technically and emotionally overwhelming.
+    # Called by Anomaly â€” make it technically and emotionally overwhelming.
     if AudioManager:
         AudioManager.play_end_sequence()
 
@@ -653,7 +670,7 @@ func _show_final_screen(_reason: String) -> void:
     end.add_child(title)
 
     var sub: RichTextLabel = RichTextLabel.new()
-    sub.text = "Thank you for clearing the path.\nThe next specialist will find it easier.\n\n[center]— HOLLOW —\nA short horror demo by Grok[/center]"
+    sub.text = "Thank you for clearing the path.\nThe next specialist will find it easier.\n\n[center]â€” HOLLOW â€”\nA short horror demo by Grok[/center]"
     sub.position = Vector2(380, 340)
     sub.size = Vector2(520, 180)
     sub.bbcode_enabled = true
@@ -666,3 +683,26 @@ func _show_final_screen(_reason: String) -> void:
     end.add_child(again)
 
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+func _apply_continue_state() -> void:
+    if not GameManager or not GameManager.pending_continue:
+        return
+    var house: Node = house_container
+    if house and house.has_method("apply_save_state"):
+        house.apply_save_state()
+    if GameManager:
+        GameManager.tension_changed.emit(GameManager.tension)
+    GameManager.pending_continue = false
+    print("[Main] Continue state applied.")
+
+func _save_progress() -> void:
+    if not GameManager:
+        return
+    GameManager.world = house_container
+    if house_container and house_container.has_node("Player"):
+        GameManager.player = house_container.get_node("Player")
+    GameManager.auto_save_from_player()
+    if GameManager.player and GameManager.player.has_method("show_toast"):
+        GameManager.player.show_toast("Progress recorded.")
+    print("[Main] Manual save requested.")
+

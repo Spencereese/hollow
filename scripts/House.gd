@@ -9,7 +9,7 @@ extends Node3D
 @warning_ignore("unsafe_property_access")
 
 @export var build_on_ready: bool = true
-@export var show_debug_markers: bool = true  # turn off once layout is solid; helps describe positions precisely (see LAYOUT DEBUG in console)
+@export var show_debug_markers: bool = false  # turn off once layout is solid; helps describe positions precisely (see LAYOUT DEBUG in console)
 
 var _materials: Dictionary = {}
 var _textures: Dictionary = {}
@@ -797,7 +797,7 @@ func _add_particles() -> void:
     dust.draw_pass_1 = draw
     add_child(dust)
 
-    # Very subtle "moth" or floating specks near anomaly (creepy) — now tension reactive for more dread
+    # Very subtle "moth" or floating specks near anomaly (creepy) â€” now tension reactive for more dread
     var moths := GPUParticles3D.new()
     moths.name = "Moths"
     moths.position = Vector3(0.3, -3.9, 7.2)
@@ -991,7 +991,7 @@ func _basement_entered() -> void:
 
 func _spawn_watcher_silhouette() -> void:
     # Technically upgraded watcher: multi-part silhouette + breathing + gaze avoidance.
-    # The house "knows" when you are looking and slowly turns the head away — pure implication horror.
+    # The house "knows" when you are looking and slowly turns the head away â€” pure implication horror.
     var w := Node3D.new()
     w.name = "Watcher"
     w.position = Vector3(1.4, 0.4, 1.2)
@@ -1021,7 +1021,7 @@ func _spawn_watcher_silhouette() -> void:
     head.material_override = dark
     w.add_child(head)
 
-    # Emissive "eyes" (the only bright thing — very effective)
+    # Emissive "eyes" (the only bright thing â€” very effective)
     for x_off in [-0.105, 0.105]:
         var eye := MeshInstance3D.new()
         eye.mesh = SphereMesh.new()
@@ -1163,7 +1163,7 @@ func _spawn_corruption_puff(pos: Vector3) -> void:
     )
 
 # Helper to fill out and use the new decal assets as dynamic projected marks on the world.
-# This makes reading notes cause permanent (for the playthrough) environmental changes — the house "remembers" and marks you.
+# This makes reading notes cause permanent (for the playthrough) environmental changes â€” the house "remembers" and marks you.
 # Uses Godot 4 Decal for technically impressive, easy projected details without editing meshes.
 func _add_decal(tex_path: String, pos: Vector3, normal: Vector3, size: Vector3 = Vector3(1.5, 1.5, 2.0)) -> void:
     var decal := Decal.new()
@@ -1198,3 +1198,46 @@ func _add_decal(tex_path: String, pos: Vector3, normal: Vector3, size: Vector3 =
     tw.tween_property(decal, "scale", Vector3(1, 1, 1), 1.8)
 
     print("[House] Spawned decal from ", tex_path, " at ", pos)
+
+func apply_save_state() -> void:
+    # Re-apply world mutations after Continue without replaying one-shot horror beats.
+    if not GameManager:
+        return
+    if GameManager.has_flag("basement_unlocked"):
+        var door := get_node_or_null("BasementDoor")
+        if door:
+            door.rotation_degrees.y = -58.0
+        print("[House] Save restore: basement door open.")
+    if GameManager.has_flag("painting_corrupted") or GameManager.is_note_collected("polaroid"):
+        var photo := get_node_or_null("Polaroid")
+        if photo:
+            var pmi: MeshInstance3D = null
+            for c in photo.get_children():
+                if c is MeshInstance3D:
+                    pmi = c
+                    break
+            if pmi:
+                var cmat := ShaderMaterial.new()
+                cmat.shader = load("res://shaders/prop_corruption.gdshader")
+                var cimg := Image.new()
+                if cimg.load("res://assets/art/family_polaroid_corrupted.jpg") == OK:
+                    cmat.set_shader_parameter("albedo_tex", ImageTexture.create_from_image(cimg))
+                cmat.set_shader_parameter("corrupt", 1.0)
+                pmi.material_override = cmat
+        print("[House] Save restore: polaroid already corrupted.")
+    if GameManager.has_flag("entered_basement_zone") or GameManager.sequence_state == "descent":
+        var lamp := get_node_or_null("BrokenLamp")
+        if lamp and lamp is Light3D:
+            (lamp as Light3D).light_energy = 0.0
+        print("[House] Save restore: basement already entered (skip watcher).")
+    if player and GameManager.pending_continue:
+        player.global_position = GameManager.saved_player_pos
+        player.rotation.y = GameManager.saved_player_yaw
+        var fl_val = player.get("flashlight_on")
+        if fl_val != null:
+            player.set("flashlight_on", GameManager.saved_flashlight_on)
+            var fl := player.get_node_or_null("Head/Camera3D/Flashlight") as SpotLight3D
+            if fl:
+                fl.visible = GameManager.saved_flashlight_on
+        print("[House] Save restore: player at ", player.global_position)
+

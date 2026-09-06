@@ -4,6 +4,7 @@ extends Control
 @onready var bg: TextureRect = $Background
 
 var start_btn: Button
+var continue_btn: Button
 var controls_btn: Button
 var quit_btn: Button
 var controls_panel: Control
@@ -31,7 +32,7 @@ func _ready() -> void:
 	if AudioManager:
 		AudioManager.start_ambient(0.18, 0.06)
 
-	print("[MainMenu] HOLLOW ready. Click Begin.")
+	print("[MainMenu] HOLLOW ready. Click Begin or Continue.")
 
 func _build_ui() -> void:
 	# Dark overlay for readability
@@ -58,21 +59,29 @@ func _build_ui() -> void:
 	# Buttons
 	start_btn = Button.new()
 	start_btn.text = "Begin"
-	start_btn.position = Vector2(124, 320)
+	start_btn.position = Vector2(124, 300)
 	start_btn.size = Vector2(220, 46)
 	start_btn.pressed.connect(_on_start)
 	add_child(start_btn)
 
+	continue_btn = Button.new()
+	continue_btn.text = "Continue"
+	continue_btn.position = Vector2(124, 356)
+	continue_btn.size = Vector2(220, 42)
+	continue_btn.pressed.connect(_on_continue)
+	add_child(continue_btn)
+	_refresh_continue()
+
 	controls_btn = Button.new()
 	controls_btn.text = "Controls"
-	controls_btn.position = Vector2(124, 380)
+	controls_btn.position = Vector2(124, 412)
 	controls_btn.size = Vector2(220, 42)
 	controls_btn.pressed.connect(_show_controls)
 	add_child(controls_btn)
 
 	quit_btn = Button.new()
 	quit_btn.text = "Quit"
-	quit_btn.position = Vector2(124, 440)
+	quit_btn.position = Vector2(124, 468)
 	quit_btn.size = Vector2(220, 42)
 	quit_btn.pressed.connect(func(): get_tree().quit())
 	add_child(quit_btn)
@@ -109,13 +118,14 @@ F — Toggle flashlight
 
 [b]Interface[/b]
 Tab / J — Open your collected notes (Journal)
-Esc — Pause / Menu
+Esc — Pause / Menu (Save Progress)
 
 [b]Atmosphere[/b]
 The light is your only reliable tool.
 The house reacts to how long you stay and what you choose to read.
 
 When the battery dies, stand still.
+Progress is auto-saved when you discover documents or unlock the basement.
 """
 	ctrl_text.position = Vector2(24, 36)
 	ctrl_text.size = Vector2(470, 320)
@@ -134,19 +144,43 @@ When the battery dies, stand still.
 	close.pressed.connect(_hide_controls)
 	cp_bg.add_child(close)
 
+func _refresh_continue() -> void:
+	if continue_btn == null:
+		return
+	var can := GameManager != null and GameManager.has_save()
+	continue_btn.disabled = not can
+	continue_btn.modulate = Color(1, 1, 1, 1) if can else Color(1, 1, 1, 0.45)
+	if can:
+		continue_btn.tooltip_text = "Resume your last visit to the property."
+	else:
+		continue_btn.tooltip_text = "No saved progress yet."
+
 func _on_start() -> void:
 	if GameManager:
 		GameManager.reset_for_new_game()
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")
 
+func _on_continue() -> void:
+	if GameManager == null or not GameManager.has_save():
+		_refresh_continue()
+		return
+	if not GameManager.load_game():
+		_refresh_continue()
+		return
+	get_tree().change_scene_to_file("res://scenes/Main.tscn")
+
 func _show_controls() -> void:
 	controls_panel.visible = true
 	start_btn.visible = false
+	if continue_btn:
+		continue_btn.visible = false
 	controls_btn.visible = false
 	quit_btn.visible = false
 
 func _hide_controls() -> void:
 	controls_panel.visible = false
 	start_btn.visible = true
+	if continue_btn:
+		continue_btn.visible = true
 	controls_btn.visible = true
 	quit_btn.visible = true
