@@ -20,6 +20,10 @@ var flashlight_battery: float = 1.0   # 0-1
 # Narrative sequence tracking (simple linear + branches for demo)
 var sequence_state: String = "arrival"  # arrival -> entry -> investigation -> descent -> end
 
+# Climax ending (R4)
+var last_ending: String = ""
+var climax_choice_pending: bool = false
+
 # Save / Continue (R3)
 const SAVE_PATH: String = "user://hollow_save.json"
 const SAVE_VERSION: int = 1
@@ -124,13 +128,66 @@ func enter_basement() -> void:
 		print("[GameManager] Descent begun.")
 		auto_save_from_player()
 
-func trigger_end(reason: String = "threshold") -> void:
+func trigger_end(reason: String = "claimed") -> void:
 	if sequence_state == "end":
 		return
+	# Normalize legacy reason
+	if reason == "threshold":
+		reason = "claimed"
 	sequence_state = "end"
+	last_ending = reason
+	climax_choice_pending = false
 	set_tension(1.0)
 	demo_ended.emit(reason)
 	print("[GameManager] DEMO END triggered: %s" % reason)
+
+func can_attempt_escape() -> bool:
+	# Thorough investigation: all four upstairs discoveries.
+	var need := ["intake_form", "polaroid", "letter", "recorder"]
+	for k in need:
+		if not collected_notes.has(k):
+			return false
+	return true
+
+func resolve_climax_choice(choice: String) -> String:
+	# choice: "step" | "refuse" -> ending id
+	var ending := "claimed"
+	if choice == "refuse":
+		if can_attempt_escape():
+			ending = "escaped"
+			set_flag("escaped_house")
+		else:
+			ending = "caught"
+			set_flag("caught_in_loop")
+	else:
+		set_flag("stepped_into_threshold")
+	trigger_end(ending)
+	return ending
+
+func get_ending_card(reason: String = "") -> Dictionary:
+	var rid := reason
+	if rid == "" or rid == "threshold":
+		rid = last_ending if last_ending != "" else "claimed"
+	var path := "res://data/endings.json"
+	var fallback := {
+		"id": rid,
+		"outcome": "fail",
+		"badge": "END",
+		"title": "PROPERTY TRANSFERRED",
+		"body": "The demo is over."
+	}
+	if not FileAccess.file_exists(path):
+		return fallback
+	var file := FileAccess.open(path, FileAccess.READ)
+	var json_str := file.get_as_text()
+	file.close()
+	var data = JSON.parse_string(json_str)
+	if typeof(data) != TYPE_DICTIONARY:
+		return fallback
+	var d: Dictionary = data
+	if d.has(rid) and typeof(d[rid]) == TYPE_DICTIONARY:
+		return d[rid]
+	return fallback
 
 func get_note_data(note_id: String) -> Dictionary:
 	# Load from data/notes.json at runtime
@@ -153,6 +210,8 @@ func reset_for_new_game() -> void:
 	time_in_house = 0.0
 	flashlight_battery = 1.0
 	sequence_state = "arrival"
+	last_ending = ""
+	climax_choice_pending = false
 	pending_continue = false
 	saved_player_pos = Vector3.ZERO
 	saved_player_yaw = 0.0

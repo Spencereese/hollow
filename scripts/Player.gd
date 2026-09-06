@@ -249,13 +249,16 @@ func _try_interact() -> void:
     # Fallback for plain visual props created in House
     var nm: String = str(collider.name)
     if nm in ["Polaroid", "IntakeForm", "VoiceRecorder", "Letter", "Radio", "TheThreshold"]:
-        # === THRESHOLD CLIMAX (core loop finish) ===
+        # === THRESHOLD CLIMAX (R4: escape-vs-fail choice) ===
         if nm == "TheThreshold":
+            if GameManager and GameManager.sequence_state == "end":
+                return
             var data_t: Dictionary = {}
             if GameManager:
                 data_t = GameManager.get_note_data("basement_note")
                 GameManager.collect_note("basement_note", data_t.get("title", "Carvings"))
                 GameManager.enter_basement()
+                GameManager.climax_choice_pending = true
             var ms_t: Node = get_tree().current_scene
             if ms_t and ms_t.has_method("show_note_reader"):
                 ms_t.show_note_reader(
@@ -264,11 +267,7 @@ func _try_interact() -> void:
                     data_t.get("reveals", ""),
                     "basement_note"
                 )
-            if GameManager:
-                GameManager.trigger_end("threshold")
-            if ms_t and ms_t.has_method("play_end_sequence"):
-                ms_t.play_end_sequence()
-            set_flashlight_battery(0.0)
+            # Do not auto-end — closing the carvings opens the climax choice.
             show_toast("The water does not reflect you anymore.")
             return
 

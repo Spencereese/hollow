@@ -1,0 +1,23 @@
+{
+  "claimed": {
+    "id": "claimed",
+    "outcome": "fail",
+    "badge": "CLAIMED",
+    "title": "PROPERTY TRANSFERRED",
+    "body": "You stepped forward.\nThe water took your name without asking.\n\nThank you for clearing the path.\nThe next specialist will find it easier.\n\n— HOLLOW —"
+  },
+  "escaped": {
+    "id": "escaped",
+    "outcome": "escape",
+    "badge": "EXIT WOUND",
+    "title": "YOU LEFT SOMETHING BEHIND",
+    "body": "You turned away from the hole.\nThe front door still opened onto a porch.\nGravel. Trees. Cold air that did not smell like the house.\n\nBehind you, the radio lists one fewer name.\nYou do not look back long enough to hear which.\n\n— HOLLOW —"
+  },
+  "caught": {
+    "id": "caught",
+    "outcome": "fail",
+    "badge": "CAUGHT",
+    "title": "THE HALLWAY AGAIN",
+    "body": "You ran for the door without knowing enough.\nThe porch was gone. Only the hallway, waiting.\n\nThe house practiced your footsteps until they belonged to it.\nYour name is already drying in the concrete.\n\n— HOLLOW —"
+  }
+}

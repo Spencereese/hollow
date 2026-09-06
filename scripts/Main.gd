@@ -14,6 +14,8 @@ var hud: Control
 var pause_menu: Control
 var postfx_rect: ColorRect
 var postfx_mat: ShaderMaterial
+var climax_panel: Control
+var _climax_resolving: bool = false
 
 var note_title_label: Label
 var note_body_label: RichTextLabel
@@ -391,8 +393,12 @@ func show_note_reader(title: String, lines: Array, reveal_text: String, note_id:
 func _close_note_reader() -> void:
     if note_reader:
         note_reader.visible = false
-    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
     _set_vignette(0.0)
+    # R4: after basement carvings, open escape-vs-fail climax choice
+    if GameManager and GameManager.climax_choice_pending and GameManager.sequence_state != "end":
+        show_climax_choice()
+        return
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _build_journal(parent: Node) -> void:
     journal_panel = Control.new()
@@ -614,16 +620,20 @@ func _set_vignette(alpha: float) -> void:
 
 func _on_demo_ended(reason: String) -> void:
     # Let the end sequence play out, then show final card
-    get_tree().create_timer(3.5).timeout.connect(func():
+    var delay := 3.2
+    if reason == "escaped":
+        delay = 4.0
+    elif reason == "caught":
+        delay = 3.6
+    get_tree().create_timer(delay).timeout.connect(func():
         _show_final_screen(reason)
     )
 
 func play_end_sequence() -> void:
-    # Called by Anomaly â€” make it technically and emotionally overwhelming.
+    # Claimed path — overwhelming takeover.
     if AudioManager:
         AudioManager.play_end_sequence()
 
-    # Max tension + postfx takeover
     if GameManager:
         GameManager.set_tension(1.0)
     if postfx_mat:
@@ -631,7 +641,6 @@ func play_end_sequence() -> void:
         postfx_mat.set_shader_parameter("grain_amount", 0.7)
         postfx_mat.set_shader_parameter("vignette_strength", 0.95)
 
-    # Kill most lights with dramatic timing
     var house: Node = get_node_or_null("House")
     if house:
         for light in house.get_children():
@@ -639,19 +648,177 @@ func play_end_sequence() -> void:
                 var tw: Tween = create_tween()
                 tw.tween_property(light, "light_energy", 0.0, 1.2 + randf() * 0.8)
 
-    # Extra: push the player toward the threshold visually if possible (subtle forced lean)
     if house:
         var p := house.get_node_or_null("Player") as CharacterBody3D
         if p:
             var tw2 := create_tween()
             tw2.tween_property(p, "rotation_degrees:y", p.rotation_degrees.y + 6.0, 4.5)
+            if p.has_method("set_flashlight_battery"):
+                p.set_flashlight_battery(0.0)
 
-func _show_final_screen(_reason: String) -> void:
+func play_escape_sequence() -> void:
+    # Escape path — lights surge, front door yawns open, battery holds a last breath.
+    if AudioManager:
+        AudioManager.play_whisper_swell(1.4)
+        AudioManager.play_door_close()
+    if GameManager:
+        GameManager.set_tension(0.55)
+    if postfx_mat:
+        postfx_mat.set_shader_parameter("tension", 0.45)
+        postfx_mat.set_shader_parameter("grain_amount", 0.35)
+        postfx_mat.set_shader_parameter("vignette_strength", 0.35)
+
+    var house: Node = get_node_or_null("House")
+    if house:
+        var fd = house.get_node_or_null("FrontDoor")
+        if fd:
+            var tw := create_tween()
+            tw.tween_property(fd, "rotation_degrees:y", -72.0, 1.1).set_trans(Tween.TRANS_SINE)
+        var p := house.get_node_or_null("Player") as CharacterBody3D
+        if p:
+            # Nudge toward porch
+            var twp := create_tween()
+            twp.tween_property(p, "global_position", Vector3(-0.1, 0.01, -2.35), 2.4).set_trans(Tween.TRANS_SINE)
+            if p.has_method("show_toast"):
+                p.show_toast("Cold air. Gravel. The porch is still there.")
+
+func play_caught_sequence() -> void:
+    # Caught path — fake escape then hallway snap-back.
+    if AudioManager:
+        AudioManager.play_anomaly_pulse()
+        AudioManager.static_volume = 0.7
+    if GameManager:
+        GameManager.set_tension(0.95)
+    if postfx_mat:
+        postfx_mat.set_shader_parameter("tension", 0.9)
+        postfx_mat.set_shader_parameter("grain_amount", 0.65)
+        postfx_mat.set_shader_parameter("vignette_strength", 0.9)
+
+    var house: Node = get_node_or_null("House")
+    if house:
+        var fd = house.get_node_or_null("FrontDoor")
+        if fd:
+            # Door opens then violently shuts / spins wrong
+            var tw := create_tween()
+            tw.tween_property(fd, "rotation_degrees:y", -50.0, 0.45)
+            tw.tween_property(fd, "rotation_degrees:y", 8.0, 0.55)
+        var p := house.get_node_or_null("Player") as CharacterBody3D
+        if p:
+            var twp := create_tween()
+            twp.tween_property(p, "global_position", Vector3(-0.2, 0.01, -1.2), 1.6)
+            if p.has_method("set_flashlight_battery"):
+                p.set_flashlight_battery(0.05)
+            if p.has_method("show_toast"):
+                p.show_toast("The porch was gone. Only the hallway.")
+
+func show_climax_choice() -> void:
+    if _climax_resolving:
+        return
+    if climax_panel and is_instance_valid(climax_panel):
+        climax_panel.visible = true
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+        return
+
+    var ui = get_node_or_null("UILayer")
+    var parent: Node = ui if ui else self
+    climax_panel = Control.new()
+    climax_panel.name = "ClimaxChoice"
+    climax_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+    climax_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+    parent.add_child(climax_panel)
+
+    var dim := ColorRect.new()
+    dim.color = Color(0.0, 0.0, 0.0, 0.78)
+    dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+    climax_panel.add_child(dim)
+
+    var card := PanelContainer.new()
+    card.position = Vector2(340, 180)
+    card.size = Vector2(600, 360)
+    var st := StyleBoxFlat.new()
+    st.bg_color = Color(0.04, 0.035, 0.04, 0.96)
+    st.border_color = Color(0.35, 0.28, 0.25, 0.85)
+    st.border_width_left = 1
+    st.border_width_right = 1
+    st.border_width_top = 1
+    st.border_width_bottom = 1
+    st.content_margin_left = 28
+    st.content_margin_right = 28
+    st.content_margin_top = 24
+    st.content_margin_bottom = 24
+    card.add_theme_stylebox_override("panel", st)
+    climax_panel.add_child(card)
+
+    var vbox := VBoxContainer.new()
+    vbox.add_theme_constant_override("separation", 14)
+    card.add_child(vbox)
+
+    var title := Label.new()
+    title.text = "THE THRESHOLD"
+    title.add_theme_font_size_override("font_size", 22)
+    title.add_theme_color_override("font_color", Color(0.72, 0.62, 0.52))
+    vbox.add_child(title)
+
+    var body := RichTextLabel.new()
+    body.bbcode_enabled = true
+    body.fit_content = true
+    body.custom_minimum_size = Vector2(520, 110)
+    var tip := "You have read the carvings. The water waits."
+    if GameManager and GameManager.can_attempt_escape():
+        tip = "You catalogued everything upstairs. The house has fewer lies left.\nYou might still leave — if you refuse the water."
+    else:
+        tip = "Something upstairs is still unread. Running now is a guess.\nThe house loves guesses."
+    body.text = tip
+    body.add_theme_color_override("default_color", Color(0.75, 0.72, 0.68))
+    vbox.add_child(body)
+
+    var step_btn := Button.new()
+    step_btn.text = "Step into the water"
+    step_btn.pressed.connect(func(): _resolve_climax_choice("step"))
+    vbox.add_child(step_btn)
+
+    var refuse_btn := Button.new()
+    refuse_btn.text = "Refuse — run for the door"
+    refuse_btn.pressed.connect(func(): _resolve_climax_choice("refuse"))
+    vbox.add_child(refuse_btn)
+
+    Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+    print("[Main] Climax choice offered (escape_ready=%s)." % str(GameManager.can_attempt_escape() if GameManager else false))
+
+func _resolve_climax_choice(choice: String) -> void:
+    if _climax_resolving:
+        return
+    _climax_resolving = true
+    if climax_panel and is_instance_valid(climax_panel):
+        climax_panel.visible = false
+    if not GameManager:
+        return
+    GameManager.climax_choice_pending = false
+    var ending: String = GameManager.resolve_climax_choice(choice)
+    match ending:
+        "escaped":
+            play_escape_sequence()
+        "caught":
+            play_caught_sequence()
+        _:
+            play_end_sequence()
+    print("[Main] Climax resolved -> %s" % ending)
+
+func _show_final_screen(reason: String) -> void:
+    # Avoid stacking
+    var ui = get_node_or_null("UILayer")
+    if ui and ui.get_node_or_null("EndScreen"):
+        return
+
+    var card_data: Dictionary = {}
+    if GameManager and GameManager.has_method("get_ending_card"):
+        card_data = GameManager.get_ending_card(reason)
+    else:
+        card_data = {"badge": "END", "title": "PROPERTY TRANSFERRED", "body": "Demo over.", "outcome": "fail"}
+
     var end: Control = Control.new()
     end.name = "EndScreen"
     end.set_anchors_preset(Control.PRESET_FULL_RECT)
-    # Add to the UILayer if present (for proper 2D overlay on 3D), else self
-    var ui = get_node_or_null("UILayer")
     if ui:
         ui.add_child(end)
     else:
@@ -662,28 +829,53 @@ func _show_final_screen(_reason: String) -> void:
     bg.set_anchors_preset(Control.PRESET_FULL_RECT)
     end.add_child(bg)
 
+    var badge: Label = Label.new()
+    badge.text = str(card_data.get("badge", "END"))
+    badge.position = Vector2(420, 200)
+    badge.add_theme_font_size_override("font_size", 16)
+    var outcome := str(card_data.get("outcome", "fail"))
+    if outcome == "escape":
+        badge.add_theme_color_override("font_color", Color(0.55, 0.75, 0.62))
+    else:
+        badge.add_theme_color_override("font_color", Color(0.75, 0.35, 0.32))
+    end.add_child(badge)
+
     var title: Label = Label.new()
-    title.text = "PROPERTY TRANSFERRED"
-    title.position = Vector2(420, 260)
+    title.text = str(card_data.get("title", "PROPERTY TRANSFERRED"))
+    title.position = Vector2(420, 240)
     title.add_theme_font_size_override("font_size", 28)
     title.add_theme_color_override("font_color", Color(0.6, 0.55, 0.5))
     end.add_child(title)
 
     var sub: RichTextLabel = RichTextLabel.new()
-    sub.text = "Thank you for clearing the path.\nThe next specialist will find it easier.\n\n[center]â€” HOLLOW â€”\nA short horror demo by Grok[/center]"
-    sub.position = Vector2(380, 340)
-    sub.size = Vector2(520, 180)
     sub.bbcode_enabled = true
+    sub.text = str(card_data.get("body", ""))
+    sub.position = Vector2(380, 300)
+    sub.size = Vector2(560, 220)
     end.add_child(sub)
+
+    # Run stats
+    var stats := Label.new()
+    var notes_n := 0
+    var t_min := 0.0
+    var tens := 0.0
+    if GameManager:
+        notes_n = GameManager.collected_notes.size()
+        t_min = GameManager.time_in_house / 60.0
+        tens = GameManager.tension
+    stats.text = "Documents %d  |  Time %.1f min  |  Tension %.0f%%  |  Ending %s" % [notes_n, t_min, tens * 100.0, reason]
+    stats.position = Vector2(380, 520)
+    stats.add_theme_font_size_override("font_size", 12)
+    stats.add_theme_color_override("font_color", Color(0.45, 0.42, 0.4))
+    end.add_child(stats)
 
     var again: Button = Button.new()
     again.text = "Return to Menu"
-    again.position = Vector2(520, 540)
+    again.position = Vector2(520, 560)
     again.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
     end.add_child(again)
 
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-
 func _apply_continue_state() -> void:
     if not GameManager or not GameManager.pending_continue:
         return
