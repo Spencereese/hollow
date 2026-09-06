@@ -222,10 +222,17 @@ func _try_interact() -> void:
 
     _trigger_vm_reach()
 
-    # Prefer explicit interactable scripts
+    # Prefer explicit interactable scripts on the collider itself
     if collider.has_method("interact"):
         collider.interact(self)
         return
+
+    # R5 live path: Note/Radio/Anomaly attached as children of prop StaticBodies
+    if collider is Node:
+        for child in (collider as Node).get_children():
+            if child.has_method("interact"):
+                child.interact(self)
+                return
 
     # Fallback: parent or group
     var parent: Node = collider.get_parent()
@@ -241,10 +248,11 @@ func _try_interact() -> void:
         if interact_node and interact_node.has_method("interact"):
             interact_node.interact(self)
             return
-        var note: Node = collider.find_child("NoteInteractable", true, false)
-        if note and note.has_method("interact"):
-            note.interact(self)
-            return
+        for child_name in ["NoteInteractable", "RadioInteractable", "Anomaly"]:
+            var wired: Node = collider.find_child(child_name, true, false)
+            if wired and wired.has_method("interact"):
+                wired.interact(self)
+                return
 
     # Fallback for plain visual props created in House
     var nm: String = str(collider.name)

@@ -209,9 +209,17 @@ func _update_interact_prompt_hud() -> void:
     var txt: String = ""
     if col and col.has_method("get_interact_prompt"):
         txt = col.get_interact_prompt()
-    elif col and col.is_in_group("interactable"):
+    # R5: prompts live on Note/Radio/Anomaly children attached to prop bodies
+    if txt == "" and col is Node:
+        for child in (col as Node).get_children():
+            if child.has_method("get_interact_prompt"):
+                var child_txt: String = child.get_interact_prompt()
+                if child_txt != "":
+                    txt = child_txt
+                    break
+    if txt == "" and col and col.is_in_group("interactable"):
         txt = "E - Examine"
-    elif col and "door" in col.name.to_lower():
+    if txt == "" and col and "door" in str(col.name).to_lower():
         if str(col.name) == "BasementDoor" and GameManager and not GameManager.has_flag("basement_unlocked"):
             txt = "E - Locked"
         else:

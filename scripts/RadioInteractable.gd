@@ -1,5 +1,6 @@
 extends Interactable
 # RadioInteractable - The old tube radio that delivers one of the strongest narrative beats.
+# R5: live-wired from House; radio_on flag keeps Continue from replaying first listen.
 
 @warning_ignore("inferred_declaration")
 
@@ -9,18 +10,25 @@ var _has_played: bool = false
 
 func _ready() -> void:
     super._ready()
-    prompt_text = "E — Turn on the radio"
+    prompt_text = "E - Turn on the radio"
+    if GameManager and GameManager.has_flag("radio_on"):
+        _has_played = true
+        prompt_text = "E - The radio is warm"
 
 func _on_interact(_player: Node) -> void:
+    if GameManager and GameManager.has_flag("radio_on"):
+        _has_played = true
     if _has_played:
         # Second interact: it is now just hissing
         if GameManager:
             GameManager.adjust_tension(0.05)
         AudioManager.set_tension(0.75) if AudioManager else null
+        if _player and _player.has_method("show_toast"):
+            _player.show_toast("The radio is only hissing now.")
         return
 
     _has_played = true
-    prompt_text = "E — The radio is warm"
+    prompt_text = "E - The radio is warm"
 
     if GameManager:
         GameManager.set_flag("radio_on")
@@ -30,7 +38,7 @@ func _on_interact(_player: Node) -> void:
         var main: Node = get_tree().current_scene
         if main and main.has_method("show_note_reader"):
             var lines: Array = data.get("excerpts", [])
-            main.show_note_reader("AM Band — 193 kHz (bleeding through)", lines, data.get("reveals", ""), note_id)
+            main.show_note_reader("AM Band - 193 kHz (bleeding through)", lines, data.get("reveals", ""), note_id)
 
     # Audio: big static swell then "voice"
     if AudioManager:

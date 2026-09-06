@@ -183,6 +183,28 @@ func _apply_animated_materials() -> void:
 
     print("[House] Animated material hooks ready (corruption on key props + anomaly).")
 
+
+func _attach_note(body: Node, note_id: String, prompt: String = "E - Read document") -> void:
+    # R5: live-path NoteInteractable child (Player prefers script children over name fallback).
+    var note = (load("res://scripts/NoteInteractable.gd") as GDScript).new()
+    note.name = "NoteInteractable"
+    note.note_id = note_id
+    note.initial_prompt = prompt
+    body.add_child(note)
+    _interactables.append(note)
+
+func _attach_radio(body: Node) -> void:
+    var radio = (load("res://scripts/RadioInteractable.gd") as GDScript).new()
+    radio.name = "RadioInteractable"
+    body.add_child(radio)
+    _interactables.append(radio)
+
+func _attach_anomaly(body: Node) -> void:
+    var anom = (load("res://scripts/Anomaly.gd") as GDScript).new()
+    anom.name = "Anomaly"
+    body.add_child(anom)
+    _interactables.append(anom)
+
 func _add_wall(pos: Vector3, size: Vector3, mat_name: String = "plaster", rot: float = 0.0) -> StaticBody3D:
     var body := StaticBody3D.new()
     body.collision_layer = 1
@@ -399,6 +421,7 @@ func _build_geometry() -> void:
     radio_body.add_child(radio_mesh)
     add_child(radio_body)
     radio_body.add_to_group("interactable")
+    _attach_radio(radio_body)
 
     # Mantel / fireplace (back wall) - filled out with shelf + brackets
     _add_prop_box(Vector3(0, 1.1, 4.0), Vector3(2.8, 1.6, 0.6), "wood", "Mantel")
@@ -410,7 +433,7 @@ func _build_geometry() -> void:
     # Fireplace opening (dark)
     _add_prop_box(Vector3(0, 0.7, 4.15), Vector3(1.6, 1.1, 0.35), "black", "Firebox")
 
-    # The polaroid on the mantel (plain body + visual for name fallback interaction)
+    # The polaroid on the mantel (R5: NoteInteractable live path)
     var photo_body := StaticBody3D.new()
     photo_body.name = "Polaroid"
     photo_body.position = Vector3(-0.6, 1.65, 3.85)
@@ -435,6 +458,7 @@ func _build_geometry() -> void:
     photo_body.add_child(photo_mesh)
     add_child(photo_body)
     photo_body.add_to_group("interactable")
+    _attach_note(photo_body, "polaroid", "E - Examine polaroid")
 
     # === NEW HYPER-REAL FRAMED ART & PROPS for atmosphere ===
     # Large mantel painting (the "wrong" landscape)
@@ -481,6 +505,7 @@ func _build_geometry() -> void:
     form_body.add_child(form_mesh)
     add_child(form_body)
     form_body.add_to_group("interactable")
+    _attach_note(form_body, "intake_form", "E - Read document")
 
     # Bedroom props
     # Bed - composed for better look (frame, mattress, pillows, headboard)
@@ -509,6 +534,7 @@ func _build_geometry() -> void:
     recorder_body.add_child(rec_mesh)
     add_child(recorder_body)
     recorder_body.add_to_group("interactable")
+    _attach_note(recorder_body, "recorder", "E - Play recording")
 
     # Letter / names list pad (use Note class) - now with hyper-real document texture
     var letter_body := StaticBody3D.new()
@@ -537,6 +563,7 @@ func _build_geometry() -> void:
     letter_body.add_child(letter_mesh)
     add_child(letter_body)
     letter_body.add_to_group("interactable")
+    _attach_note(letter_body, "letter", "E - Read letter")
 
     # Basement anomaly (the black water) - use Anomaly class
     # Now uses custom animated water shader for rippling + tension-synced pulse (technical highlight)
@@ -562,6 +589,7 @@ func _build_geometry() -> void:
     anomaly_body.add_child(water)
     add_child(anomaly_body)
     anomaly_body.add_to_group("interactable")
+    _attach_anomaly(anomaly_body)
 
     # Carved names concrete "document" visual on basement floor near threshold (hyper-real horror payoff)
     var carve := MeshInstance3D.new()
