@@ -1,4 +1,4 @@
-extends Node3D
+﻿extends Node3D
 # House - Procedural level builder for the HOLLOW demo.
 # Everything is spawned in _ready so the scene file stays tiny and changes are code-reviewable.
 # Focus on oppressive small-space realism: low ceilings, thick walls, limited sightlines, one moonlight shaft.
@@ -204,6 +204,16 @@ func _attach_anomaly(body: Node) -> void:
     anom.name = "Anomaly"
     body.add_child(anom)
     _interactables.append(anom)
+
+func _attach_hatch(body: Node, dest: Vector3, prompt: String, toast: String, flag_name: String = "") -> void:
+    var hatch = (load("res://scripts/HatchInteractable.gd") as GDScript).new()
+    hatch.name = "HatchInteractable"
+    hatch.destination = dest
+    hatch.prompt_text = prompt
+    hatch.toast_on_use = toast
+    hatch.set_flag_on_use = flag_name
+    body.add_child(hatch)
+    _interactables.append(hatch)
 
 func _add_wall(pos: Vector3, size: Vector3, mat_name: String = "plaster", rot: float = 0.0) -> StaticBody3D:
     var body := StaticBody3D.new()
@@ -666,6 +676,9 @@ func _build_geometry() -> void:
 
     # Count nodes in the "interactable" group 
     var interactable_count = get_tree().get_nodes_in_group("interactable").size()
+    # R6: short attic beat above the bedroom
+    _build_attic()
+
     print("[House] Geometry + props placed. %d interactables registered (via group)." % interactable_count)
 
     # === POST-BUILD TECH UPGRADES (shaders + animated materials on key assets) ===
@@ -674,6 +687,127 @@ func _build_geometry() -> void:
     # Visual layout aids (spawned here so they exist early; positions are source-of-truth from build)
     if show_debug_markers:
         _spawn_layout_markers()
+
+func _build_attic() -> void:
+    # R6: compact attic above the bedroom. Hatch teleports through the ceiling so we
+    # do not cut MainCeiling. Discoveries feed the same basement unlock pool.
+    var attic_y := 3.7
+    # Floor (two slabs leave a visual hatch gap near the climb point)
+    _add_prop_box(Vector3(4.35, attic_y, 3.15), Vector3(2.4, 0.12, 2.6), "wood", "AtticFloorA")
+    _add_prop_box(Vector3(2.95, attic_y, 3.55), Vector3(0.7, 0.12, 1.8), "wood", "AtticFloorB")
+    # Low walls / eaves
+    _add_wall(Vector3(4.0, 4.55, 1.55), Vector3(3.2, 1.6, 0.2), "plaster")
+    _add_wall(Vector3(4.0, 4.55, 4.55), Vector3(3.2, 1.6, 0.2), "plaster")
+    _add_wall(Vector3(2.45, 4.55, 3.05), Vector3(0.2, 1.6, 3.0), "plaster")
+    _add_wall(Vector3(5.55, 4.55, 3.05), Vector3(0.2, 1.6, 3.0), "plaster")
+    # Roof slab
+    _add_prop_box(Vector3(4.0, 5.45, 3.05), Vector3(3.4, 0.12, 3.2), "wood", "AtticRoof")
+    # Dusty bulb
+    var bulb := OmniLight3D.new()
+    bulb.name = "AtticBulb"
+    bulb.position = Vector3(4.0, 5.05, 3.0)
+    bulb.light_color = Color(0.92, 0.78, 0.55)
+    bulb.light_energy = 0.35
+    bulb.omni_range = 4.5
+    bulb.shadow_enabled = false
+    add_child(bulb)
+    # Visual ladder rungs in bedroom (flavor; climb is via hatch interact)
+    for i in 4:
+        _add_prop_box(Vector3(3.15, 0.55 + i * 0.55, 1.85), Vector3(0.45, 0.06, 0.08), "wood", "AtticRung%d" % i)
+    # Bedroom ceiling hatch panel
+    var hatch_up := _add_prop_box(Vector3(3.2, 3.25, 2.05), Vector3(0.7, 0.06, 0.7), "wood", "AtticHatch")
+    hatch_up.collision_layer = 2
+    hatch_up.collision_mask = 0
+    hatch_up.add_to_group("interactable")
+    _attach_hatch(
+        hatch_up,
+        Vector3(3.45, 3.95, 2.25),
+        "E - Climb into attic",
+        "Dust. Heat. The boards remember every footfall.",
+        "entered_attic"
+    )
+    # Attic trapdoor back down
+    var hatch_dn := _add_prop_box(Vector3(3.15, 3.82, 2.15), Vector3(0.65, 0.05, 0.65), "wood", "AtticTrapdoor")
+    hatch_dn.collision_layer = 2
+    hatch_dn.collision_mask = 0
+    hatch_dn.add_to_group("interactable")
+    _attach_hatch(
+        hatch_dn,
+        Vector3(3.25, 0.05, 2.05),
+        "E - Climb down",
+        "The bedroom air feels colder after the rafters.",
+        ""
+    )
+    # --- Discovery 1: ledger on a crate ---
+    _add_prop_box(Vector3(4.8, 3.95, 3.9), Vector3(0.7, 0.45, 0.55), "wood", "AtticCrate")
+    var ledger := StaticBody3D.new()
+    ledger.name = "AtticLedger"
+    ledger.position = Vector3(4.8, 4.28, 3.9)
+    ledger.rotation_degrees = Vector3(-78, 18, 4)
+    ledger.scale = Vector3(0.5, 0.02, 0.38)
+    ledger.collision_layer = 2
+    ledger.collision_mask = 0
+    var lshape := CollisionShape3D.new()
+    var lbox := BoxShape3D.new()
+    lbox.size = Vector3(1.0, 0.5, 0.9)
+    lshape.shape = lbox
+    ledger.add_child(lshape)
+    var lmesh := MeshInstance3D.new()
+    lmesh.mesh = QuadMesh.new()
+    lmesh.mesh.size = Vector2(1.5, 1.0)
+    var lmat := StandardMaterial3D.new()
+    lmat.albedo_color = Color(0.78, 0.72, 0.58)
+    lmat.roughness = 0.85
+    lmesh.material_override = lmat
+    ledger.add_child(lmesh)
+    add_child(ledger)
+    ledger.add_to_group("interactable")
+    _attach_note(ledger, "attic_ledger", "E - Read attic ledger")
+    # --- Discovery 2: girl's keepsake box ---
+    var gbox := StaticBody3D.new()
+    gbox.name = "GirlBox"
+    gbox.position = Vector3(5.1, 3.92, 2.4)
+    gbox.collision_layer = 2
+    gbox.collision_mask = 0
+    var gshape := CollisionShape3D.new()
+    var gbs := BoxShape3D.new()
+    gbs.size = Vector3(0.35, 0.22, 0.28)
+    gshape.shape = gbs
+    gbox.add_child(gshape)
+    var gmesh := MeshInstance3D.new()
+    gmesh.mesh = BoxMesh.new()
+    gmesh.mesh.size = Vector3(0.35, 0.22, 0.28)
+    var gmat := _materials["wood"].duplicate() as StandardMaterial3D
+    gmat.albedo_color = Color(0.45, 0.28, 0.22)
+    gmesh.material_override = gmat
+    gbox.add_child(gmesh)
+    add_child(gbox)
+    gbox.add_to_group("interactable")
+    _attach_note(gbox, "girl_box", "E - Open keepsake box")
+    # --- Discovery 3: rope day-tally on rafter ---
+    var rope := StaticBody3D.new()
+    rope.name = "RopeDays"
+    rope.position = Vector3(3.0, 4.55, 3.6)
+    rope.collision_layer = 2
+    rope.collision_mask = 0
+    var rshape := CollisionShape3D.new()
+    var rbox := BoxShape3D.new()
+    rbox.size = Vector3(0.15, 0.9, 0.15)
+    rshape.shape = rbox
+    rope.add_child(rshape)
+    var rmesh := MeshInstance3D.new()
+    rmesh.mesh = CylinderMesh.new()
+    rmesh.mesh.top_radius = 0.035
+    rmesh.mesh.bottom_radius = 0.04
+    rmesh.mesh.height = 0.95
+    rmesh.material_override = _materials.get("fabric", _materials["wood"]).duplicate()
+    rope.add_child(rmesh)
+    add_child(rope)
+    rope.add_to_group("interactable")
+    _attach_note(rope, "rope_days", "E - Examine rope tally")
+    # Trunk clutter (non-interactive)
+    _add_prop_box(Vector3(4.2, 3.95, 2.35), Vector3(0.9, 0.4, 0.5), "wood", "AtticTrunk")
+    print("[House] Attic beat built (hatch + 3 discoveries).")
 
 func _spawn_layout_markers() -> void:
     # Bright, non-colliding, labeled reference markers. Colors:
@@ -698,6 +832,10 @@ func _spawn_layout_markers() -> void:
         {"pos": Vector3(-1.0, 0.4, -3.3), "col": Color(0.95, 0.45, 0.85), "lbl": "LPorchWall"},
         {"pos": Vector3(1.0, 0.4, -3.3), "col": Color(0.95, 0.45, 0.85), "lbl": "RPorchWall"},
         {"pos": Vector3(4.0, 1.0, 1.55), "col": Color(0.6, 0.85, 0.6), "lbl": "BedroomDoorway"},
+        {"pos": Vector3(3.2, 3.25, 2.05), "col": Color(0.85, 0.55, 0.2), "lbl": "AtticHatch"},
+        {"pos": Vector3(4.8, 4.28, 3.9), "col": Color(1, 0.95, 0.2), "lbl": "AtticLedger"},
+        {"pos": Vector3(5.1, 3.92, 2.4), "col": Color(1, 0.95, 0.2), "lbl": "GirlBox"},
+        {"pos": Vector3(3.0, 4.55, 3.6), "col": Color(1, 0.95, 0.2), "lbl": "RopeDays"},
         # New art props (yellowish for visual clutter)
         {"pos": Vector3(0.1, 2.55, 4.35), "col": Color(0.95, 0.85, 0.3), "lbl": "MantelPainting"},
         {"pos": Vector3(5.25, 2.1, 0.2), "col": Color(0.95, 0.85, 0.3), "lbl": "SpecialistsPhoto"},
@@ -825,7 +963,7 @@ func _add_particles() -> void:
     dust.draw_pass_1 = draw
     add_child(dust)
 
-    # Very subtle "moth" or floating specks near anomaly (creepy) â€” now tension reactive for more dread
+    # Very subtle "moth" or floating specks near anomaly (creepy) Ã¢â‚¬â€ now tension reactive for more dread
     var moths := GPUParticles3D.new()
     moths.name = "Moths"
     moths.position = Vector3(0.3, -3.9, 7.2)
@@ -973,6 +1111,31 @@ func _on_note_collected(note_id: String, _title: String) -> void:
         # The previous specialist's letter leaves a mark
         _add_decal("res://assets/art/decals/water_stain_decal.jpg", Vector3(3.2, 1.0, 4.1), Vector3(0,0,-1), Vector3(0.8, 0.6, 1.5))
 
+
+    if note_id == "attic_ledger":
+        if AudioManager:
+            AudioManager.play_whisper_swell(1.4)
+        _add_decal("res://assets/art/decals/carved_overlay_decal.jpg", Vector3(4.6, 4.2, 4.4), Vector3(0,0,-1), Vector3(0.9, 0.6, 1.6))
+        if player and player.has_method("show_toast"):
+            player.show_toast("Somewhere below, a drawer slides shut by itself.")
+
+    if note_id == "girl_box":
+        _spawn_corruption_puff(Vector3(4.2, 0.7, 3.6))
+        _add_decal("res://assets/art/decals/handprint_decal.jpg", Vector3(4.9, 1.5, 4.2), Vector3(0,0,-1), Vector3(0.7, 0.7, 1.8))
+        if AudioManager:
+            AudioManager.play_anomaly_pulse()
+
+    if note_id == "rope_days":
+        if GameManager:
+            GameManager.adjust_tension(0.08)
+        var ab := get_node_or_null("AtticBulb") as OmniLight3D
+        if ab:
+            var tw := create_tween()
+            tw.tween_property(ab, "light_energy", 0.08, 0.4)
+            tw.tween_property(ab, "light_energy", 0.42, 1.2)
+        if AudioManager:
+            AudioManager.play_creak(1.0)
+
     if note_id == "basement_note":
         # Already handled some in the match, but ensure a strong mark near the threshold
         _add_decal("res://assets/art/decals/mold_decal.jpg", Vector3(1.8, -3.8, 6.8), Vector3(0,1,0), Vector3(1.8, 1.4, 2.5))
@@ -1019,7 +1182,7 @@ func _basement_entered() -> void:
 
 func _spawn_watcher_silhouette() -> void:
     # Technically upgraded watcher: multi-part silhouette + breathing + gaze avoidance.
-    # The house "knows" when you are looking and slowly turns the head away â€” pure implication horror.
+    # The house "knows" when you are looking and slowly turns the head away Ã¢â‚¬â€ pure implication horror.
     var w := Node3D.new()
     w.name = "Watcher"
     w.position = Vector3(1.4, 0.4, 1.2)
@@ -1049,7 +1212,7 @@ func _spawn_watcher_silhouette() -> void:
     head.material_override = dark
     w.add_child(head)
 
-    # Emissive "eyes" (the only bright thing â€” very effective)
+    # Emissive "eyes" (the only bright thing Ã¢â‚¬â€ very effective)
     for x_off in [-0.105, 0.105]:
         var eye := MeshInstance3D.new()
         eye.mesh = SphereMesh.new()
@@ -1191,7 +1354,7 @@ func _spawn_corruption_puff(pos: Vector3) -> void:
     )
 
 # Helper to fill out and use the new decal assets as dynamic projected marks on the world.
-# This makes reading notes cause permanent (for the playthrough) environmental changes â€” the house "remembers" and marks you.
+# This makes reading notes cause permanent (for the playthrough) environmental changes Ã¢â‚¬â€ the house "remembers" and marks you.
 # Uses Godot 4 Decal for technically impressive, easy projected details without editing meshes.
 func _add_decal(tex_path: String, pos: Vector3, normal: Vector3, size: Vector3 = Vector3(1.5, 1.5, 2.0)) -> void:
     var decal := Decal.new()

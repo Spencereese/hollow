@@ -1,4 +1,4 @@
-extends CharacterBody3D
+﻿extends CharacterBody3D
 # Player - First-person controller for HOLLOW.
 # Mouse look (captured), WASD + sprint, head bob, lean, flashlight with battery + flicker.
 # Interaction via RayCast + E. All input actions defined in project.godot.
@@ -51,7 +51,7 @@ func _ready() -> void:
 
     # Build the first-person viewmodel (hands + grip). This + shaders + upgraded assets = technically impressive.
     _build_viewmodel()
-    _attach_flashlight_particles()  # godray dust in the beam â€” huge technical + atmosphere win
+    _attach_flashlight_particles()  # godray dust in the beam Ã¢â‚¬â€ huge technical + atmosphere win
 
     # On macOS (and often other platforms), forcing CAPTURED immediately in _ready frequently fails to grab the cursor
     # until the user has clicked inside the game window. Start with visible mouse; we'll capture on first click.
@@ -83,10 +83,10 @@ func _ready() -> void:
         ray.target_position = Vector3(0, 0, -3.8)
         ray.collision_mask = 1 | 2  # walls + interactables
 
-    print("[Player] Ready. Mouse starts visible â€” click or move mouse in the 3D view to capture for looking. F toggles light, E interacts.")
+    print("[Player] Ready. Mouse starts visible Ã¢â‚¬â€ click or move mouse in the 3D view to capture for looking. F toggles light, E interacts.")
 
 func _unhandled_input(event: InputEvent) -> void:
-    # Click-to-capture (or motion) for mouse look â€” required on macOS for reliable cursor grab.
+    # Click-to-capture (or motion) for mouse look Ã¢â‚¬â€ required on macOS for reliable cursor grab.
     if not _mouse_captured:
         if (event is InputEventMouseButton and event.pressed) or event is InputEventMouseMotion:
             capture_mouse(true)
@@ -256,7 +256,20 @@ func _try_interact() -> void:
 
     # Fallback for plain visual props created in House
     var nm: String = str(collider.name)
-    if nm in ["Polaroid", "IntakeForm", "VoiceRecorder", "Letter", "Radio", "TheThreshold"]:
+    if nm in ["Polaroid", "IntakeForm", "VoiceRecorder", "Letter", "Radio", "TheThreshold", "AtticHatch", "AtticTrapdoor", "AtticLedger", "GirlBox", "RopeDays"]:
+        # === ATTIC HATCH / TRAPDOOR (R6) ===
+        if nm == "AtticHatch" or nm == "AtticTrapdoor":
+            var dest := Vector3(3.45, 3.95, 2.25) if nm == "AtticHatch" else Vector3(3.25, 0.05, 2.05)
+            global_position = dest
+            velocity = Vector3.ZERO
+            if nm == "AtticHatch" and GameManager:
+                GameManager.set_flag("entered_attic")
+                GameManager.adjust_tension(0.04)
+            show_toast("Dust. Heat. The boards remember every footfall." if nm == "AtticHatch" else "The bedroom air feels colder after the rafters.")
+            if AudioManager:
+                AudioManager.play_creak(0.75)
+            return
+
         # === THRESHOLD CLIMAX (R4: escape-vs-fail choice) ===
         if nm == "TheThreshold":
             if GameManager and GameManager.sequence_state == "end":
@@ -275,7 +288,7 @@ func _try_interact() -> void:
                     data_t.get("reveals", ""),
                     "basement_note"
                 )
-            # Do not auto-end — closing the carvings opens the climax choice.
+            # Do not auto-end â€” closing the carvings opens the climax choice.
             show_toast("The water does not reflect you anymore.")
             return
 
@@ -297,7 +310,7 @@ func _try_interact() -> void:
             var ms_r: Node = get_tree().current_scene
             if ms_r and ms_r.has_method("show_note_reader"):
                 ms_r.show_note_reader(
-                    "AM Band â€” 193 kHz (bleeding through)",
+                    "AM Band Ã¢â‚¬â€ 193 kHz (bleeding through)",
                     data_r.get("excerpts", []),
                     data_r.get("reveals", ""),
                     "recorder"
@@ -320,6 +333,12 @@ func _try_interact() -> void:
             nid = "recorder"
         elif nm == "Letter":
             nid = "letter"
+        elif nm == "AtticLedger":
+            nid = "attic_ledger"
+        elif nm == "GirlBox":
+            nid = "girl_box"
+        elif nm == "RopeDays":
+            nid = "rope_days"
         if nid != "" and GameManager:
             var data: Dictionary = GameManager.get_note_data(nid)
             GameManager.collect_note(nid, data.get("title", nm))
@@ -344,7 +363,7 @@ func _try_interact() -> void:
                 if AudioManager:
                     AudioManager.play_creak(0.35)
                 return
-            # Already unlocked â€” nudge further open if still mostly shut
+            # Already unlocked Ã¢â‚¬â€ nudge further open if still mostly shut
             if abs(collider.rotation_degrees.y) < 40.0:
                 collider.rotation_degrees.y = -55.0
                 if AudioManager:
@@ -460,7 +479,7 @@ func _build_viewmodel() -> void:
     palm.rotation_degrees = Vector3(18, 8, -12)
     _viewmodel.add_child(palm)
 
-    # Fingers (4 + thumb) â€” loose natural hold pose for gripping the light
+    # Fingers (4 + thumb) Ã¢â‚¬â€ loose natural hold pose for gripping the light
     var finger_mat = skin
     for i in 4:
         var f := MeshInstance3D.new()

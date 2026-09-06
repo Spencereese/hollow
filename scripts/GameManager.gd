@@ -1,4 +1,4 @@
-extends Node
+﻿extends Node
 # GameManager - Central state for the HOLLOW demo.
 # Tracks narrative progress, collected documents, tension, and demo completion.
 # Uses signals so UI, audio, and world can react without tight coupling.
@@ -85,6 +85,15 @@ func collect_note(note_id: String, title: String) -> void:
 		"recorder":
 			adjust_tension(0.22)
 			set_flag("recorder_played")
+		"attic_ledger":
+			adjust_tension(0.16)
+			set_flag("attic_catalogued")
+		"girl_box":
+			adjust_tension(0.2)
+			set_flag("found_her_box")
+		"rope_days":
+			adjust_tension(0.14)
+			set_flag("counted_the_days")
 		"basement_note":
 			adjust_tension(0.3)
 			set_flag("basement_truth_seen")
@@ -96,7 +105,8 @@ func check_progression() -> void:
 	# Unlock basement after enough discovery - finishes the explore -> discover -> descend loop.
 	if has_flag("basement_unlocked"):
 		return
-	var keys := ["intake_form", "polaroid", "letter", "recorder"]
+	# R6: attic discoveries also count toward the unlock pool.
+	var keys := ["intake_form", "polaroid", "letter", "recorder", "attic_ledger", "girl_box", "rope_days"]
 	var n := 0
 	for k in keys:
 		if collected_notes.has(k):

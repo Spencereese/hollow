@@ -1,4 +1,4 @@
-extends Node3D
+﻿extends Node3D
 # Main - In-game orchestrator for HOLLOW.
 # Handles House instancing, HUD, full-screen NoteReader, Journal, pause, and end sequence.
 # This is the "real" main scene after menu.
@@ -243,7 +243,9 @@ func _update_location_hud() -> void:
         return
     var pos: Vector3 = p.global_position
     var name_loc := "Living Room"
-    if pos.y < -2.0:
+    if pos.y > 3.2:
+        name_loc = "Attic"
+    elif pos.y < -2.0:
         name_loc = "Basement"
     elif pos.x > 2.5 and pos.z > 1.2:
         name_loc = "Bedroom"
@@ -435,7 +437,7 @@ func _build_journal(parent: Node) -> void:
     journal_panel.move_child(cover, 1)
 
     var title: Label = Label.new()
-    title.text = "YOUR NOTES â€” Property Relocation Division"
+    title.text = "YOUR NOTES Ã¢â‚¬â€ Property Relocation Division"
     title.position = Vector2(80, 40)
     title.add_theme_font_size_override("font_size", 20)
     journal_panel.add_child(title)
@@ -638,7 +640,7 @@ func _on_demo_ended(reason: String) -> void:
     )
 
 func play_end_sequence() -> void:
-    # Claimed path — overwhelming takeover.
+    # Claimed path â€” overwhelming takeover.
     if AudioManager:
         AudioManager.play_end_sequence()
 
@@ -665,7 +667,7 @@ func play_end_sequence() -> void:
                 p.set_flashlight_battery(0.0)
 
 func play_escape_sequence() -> void:
-    # Escape path — lights surge, front door yawns open, battery holds a last breath.
+    # Escape path â€” lights surge, front door yawns open, battery holds a last breath.
     if AudioManager:
         AudioManager.play_whisper_swell(1.4)
         AudioManager.play_door_close()
@@ -691,7 +693,7 @@ func play_escape_sequence() -> void:
                 p.show_toast("Cold air. Gravel. The porch is still there.")
 
 func play_caught_sequence() -> void:
-    # Caught path — fake escape then hallway snap-back.
+    # Caught path â€” fake escape then hallway snap-back.
     if AudioManager:
         AudioManager.play_anomaly_pulse()
         AudioManager.static_volume = 0.7
@@ -773,7 +775,7 @@ func show_climax_choice() -> void:
     body.custom_minimum_size = Vector2(520, 110)
     var tip := "You have read the carvings. The water waits."
     if GameManager and GameManager.can_attempt_escape():
-        tip = "You catalogued everything upstairs. The house has fewer lies left.\nYou might still leave — if you refuse the water."
+        tip = "You catalogued everything upstairs. The house has fewer lies left.\nYou might still leave â€” if you refuse the water."
     else:
         tip = "Something upstairs is still unread. Running now is a guess.\nThe house loves guesses."
     body.text = tip
@@ -786,7 +788,7 @@ func show_climax_choice() -> void:
     vbox.add_child(step_btn)
 
     var refuse_btn := Button.new()
-    refuse_btn.text = "Refuse — run for the door"
+    refuse_btn.text = "Refuse â€” run for the door"
     refuse_btn.pressed.connect(func(): _resolve_climax_choice("refuse"))
     vbox.add_child(refuse_btn)
 

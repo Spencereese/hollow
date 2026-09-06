@@ -1,8 +1,8 @@
-{
+﻿{
   "intake_form": {
     "id": "intake_form",
     "title": "SPECIAL INTAKE & CLEARANCE FORM",
-    "subtitle": "Property Relocation Division — File #H-1974-09",
+    "subtitle": "Property Relocation Division â€” File #H-1974-09",
     "excerpts": [
       "Property: Unlisted lakeside residence, 14.2 acres, access road unmarked.",
       "Client: [REDACTED] / Authority granted under Special Clearance Protocol 7.",
@@ -15,7 +15,7 @@
   },
   "polaroid": {
     "id": "polaroid",
-    "title": "Polaroid — 'The Family'",
+    "title": "Polaroid â€” 'The Family'",
     "subtitle": "Dated October 1974 on the back in pencil",
     "initial_desc": "A mother and father stand behind a young girl in front of the stone fireplace. Everyone is smiling. The flash is harsh. The girl is holding a small stuffed rabbit by one ear.",
     "corrupted_desc": "The girl's face has been burned away with something chemical after the photo was developed. The smear starts at the eyes and pulls downward, as if the image itself tried to look away. The rabbit is still there. The parents are still smiling.",
@@ -31,7 +31,7 @@
       "There are fourteen previous intake forms in the study desk. All of them are signed by different people. All of them have my name as the 'Current Assignee' on the last line.",
       "I keep hearing the radio even when it is off. It says the names of people who are not here.",
       "I am coming home tomorrow. I love you. Tell the girls I will take them to the lake when this is done.",
-      "— M"
+      "â€” M"
     ],
     "reveals": "The letter is dated three weeks ago. There is a small dried blood spot on the corner near the word 'home'."
   },
@@ -50,7 +50,7 @@
   },
   "recorder": {
     "id": "recorder",
-    "title": "Digital Voice Memo — 00:04:11",
+    "title": "Digital Voice Memo â€” 00:04:11",
     "subtitle": "The device was already recording when you found it",
     "excerpts": [
       "[soft static, then a calm male voice, close to the mic]",
@@ -63,5 +63,45 @@
       "My name was Michael. If you make it out, tell Elena the girls should not come looking."
     ],
     "reveals": "The timestamp on the file properties says it was recorded 41 minutes from now."
+  },
+  "attic_ledger": {
+    "id": "attic_ledger",
+    "title": "PROPERTY CLAIM LEDGER - ATTIC COPY",
+    "subtitle": "Carbon paper, water-warped, stapled to a rafter",
+    "excerpts": [
+      "Claimants logged for Special Clearance Protocol 7 (attic duplicate).",
+      "01 M.R. - catalog complete. Status: transferred.",
+      "02 E.V. - refused descent. Status: looped.",
+      "03 [illegible] - photographed the girl. Status: redacted.",
+      "14 Current assignee: see intake. Status: pending.",
+      "Margin note in pencil: 'Do not leave the ledger downstairs. The house reads it first.'"
+    ],
+    "reveals": "Your name is already penciled on line 15. The graphite is still warm."
+  },
+  "girl_box": {
+    "id": "girl_box",
+    "title": "Keepsake Box - Initials scratched 'S.'",
+    "subtitle": "Ribbon faded to the color of old milk",
+    "excerpts": [
+      "Inside: a rabbit ear (stuffing yellowed), a milk tooth, and a folded note.",
+      "'If you hide up here it cannot count you as easily.'",
+      "'It learns faces from the forms. It learns names from the radio.'",
+      "'I stayed by becoming quiet. You can too. Or you can finish the list.'",
+      "Under the lining, in a child's hand: 'practice makes empty.'"
+    ],
+    "reveals": "The rabbit ear matches the polaroid. The tooth is adult-sized."
+  },
+  "rope_days": {
+    "id": "rope_days",
+    "title": "Rope Day-Tally",
+    "subtitle": "Knotted clothesline nailed under the eaves",
+    "excerpts": [
+      "Seventeen knots. Three cut. One half-tied and still soft.",
+      "A paper tag on the last firm knot: 'Do not add another.'",
+      "Chalk on the rafter above: 'DAYS THE PORCH CAME BACK' with twelve marks, then a smear.",
+      "Beside it, smaller: 'basement after three truths. attic remembers the rest.'"
+    ],
+    "reveals": "When you touch the soft knot, it tightens once, by itself."
   }
 }
+
