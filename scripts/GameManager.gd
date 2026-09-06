@@ -76,7 +76,21 @@ func collect_note(note_id: String, title: String) -> void:
         "basement_note":
             adjust_tension(0.3)
             set_flag("basement_truth_seen")
+    check_progression()
     print("[GameManager] Note collected: %s (tension=%.2f)" % [note_id, tension])
+
+func check_progression() -> void:
+    # Unlock basement after enough discovery - finishes the explore -> discover -> descend loop.
+    if has_flag("basement_unlocked"):
+        return
+    var keys := ["intake_form", "polaroid", "letter", "recorder"]
+    var n := 0
+    for k in keys:
+        if collected_notes.has(k):
+            n += 1
+    if n >= 3:
+        unlock_basement()
+        print("[GameManager] Progression: %d discoveries - basement unlocked." % n)
 
 func mark_note_read(note_id: String) -> void:
     read_notes[note_id] = true

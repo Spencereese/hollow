@@ -114,10 +114,33 @@ func _build_hud(parent: Node) -> void:
     ip.mouse_filter = Control.MOUSE_FILTER_IGNORE
     hud.add_child(ip)
 
+    # Location label (makes 2-3 spaces feel real)
+    var loc: Label = Label.new()
+    loc.name = "LocationLabel"
+    loc.text = "Living Room"
+    loc.position = Vector2(28, 28)
+    loc.add_theme_font_size_override("font_size", 14)
+    loc.add_theme_color_override("font_color", Color(0.72, 0.68, 0.6, 0.85))
+    loc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    hud.add_child(loc)
+
+    # Toast (bottom center, driven by Player.show_toast)
+    var toast: Label = Label.new()
+    toast.name = "ToastLabel"
+    toast.text = ""
+    toast.position = Vector2(280, 560)
+    toast.size = Vector2(720, 40)
+    toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    toast.add_theme_font_size_override("font_size", 16)
+    toast.add_theme_color_override("font_color", Color(0.9, 0.82, 0.7, 0.95))
+    toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    toast.visible = false
+    hud.add_child(toast)
+
     # Bottom help line (fades after a while)
     var help: Label = Label.new()
     help.name = "HelpLine"
-    help.text = "WASD move  •  F light  •  E examine  •  Tab/J journal  •  Esc pause  •  Click/move mouse in window to capture for look"
+    help.text = "WASD move  |  F light  |  E examine  |  Tab/J journal  |  Esc pause  |  Click/move mouse to capture look"
     help.position = Vector2(380, 680)
     help.add_theme_font_size_override("font_size", 12)
     help.add_theme_color_override("font_color", Color(0.55, 0.52, 0.48, 0.65))
@@ -136,6 +159,8 @@ func _build_hud(parent: Node) -> void:
     t.autostart = true
     t.timeout.connect(_update_battery_hud)
     t.timeout.connect(_update_interact_prompt_hud)
+    t.timeout.connect(_update_location_hud)
+    t.timeout.connect(_update_toast_hud)
     hud.add_child(t)
 
 func _update_battery_hud() -> void:
@@ -175,15 +200,55 @@ func _update_interact_prompt_hud() -> void:
     if col and col.has_method("get_interact_prompt"):
         txt = col.get_interact_prompt()
     elif col and col.is_in_group("interactable"):
-        txt = "E — Examine"
+        txt = "E - Examine"
     elif col and "door" in col.name.to_lower():
-        txt = "E — Open"
+        if str(col.name) == "BasementDoor" and GameManager and not GameManager.has_flag("basement_unlocked"):
+            txt = "E - Locked"
+        else:
+            txt = "E - Open"
 
     if txt != "":
         prompt_lbl.text = txt
         prompt_lbl.visible = true
     else:
         prompt_lbl.visible = false
+
+
+func _update_location_hud() -> void:
+    if not hud or not is_instance_valid(house_container):
+        return
+    var lbl: Label = hud.get_node_or_null("LocationLabel") as Label
+    if not lbl:
+        return
+    var p: CharacterBody3D = house_container.get_node_or_null("Player") as CharacterBody3D
+    if not p:
+        return
+    var pos: Vector3 = p.global_position
+    var name_loc := "Living Room"
+    if pos.y < -2.0:
+        name_loc = "Basement"
+    elif pos.x > 2.5 and pos.z > 1.2:
+        name_loc = "Bedroom"
+    elif pos.z < -2.2:
+        name_loc = "Porch"
+    lbl.text = name_loc
+
+func _update_toast_hud() -> void:
+    if not hud or not is_instance_valid(house_container):
+        return
+    var toast: Label = hud.get_node_or_null("ToastLabel") as Label
+    if not toast:
+        return
+    var p: Node = house_container.get_node_or_null("Player")
+    if not p or not p.has_method("show_toast"):
+        toast.visible = false
+        return
+    var until_ms: int = int(p.get("_toast_until_ms"))
+    if until_ms > Time.get_ticks_msec():
+        toast.text = str(p.get("_toast_text"))
+        toast.visible = toast.text != ""
+    else:
+        toast.visible = false
 
 func _build_note_reader(parent: Node) -> void:
     note_reader = Control.new()

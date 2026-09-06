@@ -974,6 +974,9 @@ func _unlock_basement_door() -> void:
     # Creak from below
     get_tree().create_timer(0.9).timeout.connect(func(): if AudioManager: AudioManager.play_creak(1.0))
 
+    if player and player.has_method("show_toast"):
+        player.show_toast("Somewhere below, a door unlatches.")
+
 func _basement_entered() -> void:
     # Lights die, static rises, the house reacts
     var lamp := get_node_or_null("BrokenLamp")
@@ -1112,6 +1115,15 @@ func _process(delta: float) -> void:
 
     # Subtle living house: if we had converted some walls to shader we could drive breathe here.
     # For now the flicker + anomaly + (later) prop mutations sell the tech.
+
+    # Descent trigger: crossing into the basement after unlock fires watcher / tension once.
+    if GameManager and player and is_instance_valid(player):
+        if not GameManager.has_flag("entered_basement_zone"):
+            if player.global_position.y < -2.5 and player.global_position.z > 5.0:
+                GameManager.set_flag("entered_basement_zone")
+                GameManager.enter_basement()
+                if player.has_method("show_toast"):
+                    player.show_toast("The air changes. Something followed you down.")
 
 func _hash(s: String) -> float:
     var h := 0.0

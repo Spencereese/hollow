@@ -33,6 +33,8 @@ var _flicker_target: float = 1.0
 
 # Interaction
 var _last_interact_target: Node = null
+var _toast_text: String = ""
+var _toast_until_ms: int = 0
 
 # First-person viewmodel (the big technical immersion upgrade)
 var _viewmodel: Node3D
@@ -217,6 +219,8 @@ func _try_interact() -> void:
     if not collider:
         return
 
+    _trigger_vm_reach()
+
     # Prefer explicit interactable scripts
     if collider.has_method("interact"):
         collider.interact(self)
@@ -228,7 +232,7 @@ func _try_interact() -> void:
         parent.interact(self)
         return
 
-    # If collider in group "interactable", find the interactable node (may be parent if collider is the Area child)
+    # If collider in group "interactable", find the interactable node
     if collider.is_in_group("interactable"):
         var interact_node: Node = collider
         if not interact_node.has_method("interact"):
@@ -236,22 +240,78 @@ func _try_interact() -> void:
         if interact_node and interact_node.has_method("interact"):
             interact_node.interact(self)
             return
-        # fallback to old find child
         var note: Node = collider.find_child("NoteInteractable", true, false)
         if note and note.has_method("interact"):
             note.interact(self)
             return
 
-    # Fallback for plain visual props created in House (the ones that used to be Note/Radio/Anomaly instances)
+    # Fallback for plain visual props created in House
     var nm: String = str(collider.name)
     if nm in ["Polaroid", "IntakeForm", "VoiceRecorder", "Letter", "Radio", "TheThreshold"]:
+        # === THRESHOLD CLIMAX (core loop finish) ===
+        if nm == "TheThreshold":
+            var data_t: Dictionary = {}
+            if GameManager:
+                data_t = GameManager.get_note_data("basement_note")
+                GameManager.collect_note("basement_note", data_t.get("title", "Carvings"))
+                GameManager.enter_basement()
+            var ms_t: Node = get_tree().current_scene
+            if ms_t and ms_t.has_method("show_note_reader"):
+                ms_t.show_note_reader(
+                    data_t.get("title", "Carvings"),
+                    data_t.get("excerpts", []),
+                    data_t.get("reveals", ""),
+                    "basement_note"
+                )
+            if GameManager:
+                GameManager.trigger_end("threshold")
+            if ms_t and ms_t.has_method("play_end_sequence"):
+                ms_t.play_end_sequence()
+            set_flashlight_battery(0.0)
+            show_toast("The water does not reflect you anymore.")
+            return
+
+        # === RADIO (match RadioInteractable intent) ===
+        if nm == "Radio":
+            var data_r: Dictionary = {}
+            if GameManager:
+                if GameManager.has_flag("radio_on"):
+                    GameManager.adjust_tension(0.05)
+                    if AudioManager:
+                        AudioManager.set_tension(0.75)
+                    show_toast("The radio is only hissing now.")
+                    return
+                GameManager.set_flag("radio_on")
+                data_r = GameManager.get_note_data("recorder")
+                GameManager.collect_note("recorder", data_r.get("title", "Broadcast"))
+                GameManager.adjust_tension(0.25)
+                GameManager.set_flag("heard_the_list")
+            var ms_r: Node = get_tree().current_scene
+            if ms_r and ms_r.has_method("show_note_reader"):
+                ms_r.show_note_reader(
+                    "AM Band — 193 kHz (bleeding through)",
+                    data_r.get("excerpts", []),
+                    data_r.get("reveals", ""),
+                    "recorder"
+                )
+            if AudioManager:
+                AudioManager.static_volume = 0.6
+                AudioManager.play_whisper_swell(2.4)
+                get_tree().create_timer(3.2).timeout.connect(func():
+                    if AudioManager:
+                        AudioManager.play_anomaly_pulse()
+                )
+            return
+
         var nid: String = ""
-        if nm == "Polaroid": nid = "polaroid"
-        elif nm == "IntakeForm": nid = "intake_form"
-        elif nm == "VoiceRecorder": nid = "recorder"
-        elif nm == "Letter": nid = "letter"
-        elif nm == "Radio": nid = "recorder"
-        elif nm == "TheThreshold": nid = "basement_note"
+        if nm == "Polaroid":
+            nid = "polaroid"
+        elif nm == "IntakeForm":
+            nid = "intake_form"
+        elif nm == "VoiceRecorder":
+            nid = "recorder"
+        elif nm == "Letter":
+            nid = "letter"
         if nid != "" and GameManager:
             var data: Dictionary = GameManager.get_note_data(nid)
             GameManager.collect_note(nid, data.get("title", nm))
@@ -268,8 +328,22 @@ func _try_interact() -> void:
                 ms.show_note_reader(t, lines, rev, nid)
         return
 
-    # Doors: simple "open" interaction (rotate the visual body)
+    # Doors: locked basement gate, otherwise simple open
     if "door" in nm.to_lower():
+        if nm == "BasementDoor":
+            if not GameManager or not GameManager.has_flag("basement_unlocked"):
+                show_toast("The door is locked from this side. Something still wants to be found.")
+                if AudioManager:
+                    AudioManager.play_creak(0.35)
+                return
+            # Already unlocked — nudge further open if still mostly shut
+            if abs(collider.rotation_degrees.y) < 40.0:
+                collider.rotation_degrees.y = -55.0
+                if AudioManager:
+                    AudioManager.play_creak(0.7)
+            else:
+                show_toast("The stairs breathe cold air.")
+            return
         collider.rotation_degrees.y += 55.0
         if AudioManager:
             AudioManager.play_creak(0.6)
@@ -326,6 +400,11 @@ func capture_mouse(capture: bool) -> void:
     _mouse_captured = capture
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED if capture else Input.MOUSE_MODE_VISIBLE)
 
+
+func show_toast(msg: String, duration_sec: float = 3.2) -> void:
+    _toast_text = msg
+    _toast_until_ms = Time.get_ticks_msec() + int(duration_sec * 1000.0)
+    print("[Player] Toast: %s" % msg)
 func set_flashlight_battery(value: float) -> void:
     if GameManager:
         GameManager.flashlight_battery = clamp(value, 0.0, 1.0)
